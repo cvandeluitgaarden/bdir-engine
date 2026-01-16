@@ -1,0 +1,7 @@
+[workspace]
+resolver = "2"
+members = [
+  "crates/bdir-core",
+  "crates/bdir-editpacket",
+  "crates/bdir-cli",
+]
