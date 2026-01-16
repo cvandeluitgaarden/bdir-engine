@@ -1,30 +1,17 @@
+mod util_fs;
+mod util_hash;
 use bdir_core::model::Document;
-
-fn is_hex16(s: &str) -> bool {
-    s.len() == 16 && s.bytes().all(|b| matches!(b, b'0'..=b'9' | b'a'..=b'f'))
-}
 
 #[test]
 fn golden_hashes_example_document_v1() {
-    let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-    .join("..")
-    .join("..")
-    .join("examples")
-    .join("document.json");
-
-    // Load the example document JSON from the repo root.
-    let json = std::fs::read_to_string(&path)
-    .expect("examples/document.json must exist");
-
+    let json = util_fs::read_example_document_json();
     let mut doc: Document = serde_json::from_str(&json).expect("document.json must parse");
 
     doc.recompute_hashes();
 
-    // Basic sanity
-    assert!(is_hex16(&doc.page_hash), "page_hash should be 16-char lowercase hex");
-    assert!(!doc.blocks.is_empty(), "document should have blocks");
+    assert!(util_hash::is_hex16(&doc.page_hash), "page_hash should be 16-char lowercase hex");
     for b in &doc.blocks {
-        assert!(is_hex16(&b.text_hash), "block text_hash should be 16-char lowercase hex");
+        assert!(util_hash::is_hex16(&b.text_hash), "block text_hash should be 16-char lowercase hex");
     }
 
     // ---- GOLDEN ASSERTS ----
