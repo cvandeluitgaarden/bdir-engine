@@ -32,8 +32,8 @@ fn main() -> anyhow::Result<()> {
     match cli.cmd {
         Command::EditPacket { input, tid, min } => {
             let s = fs::read_to_string(&input)?;
-            let doc: Document = serde_json::from_str(&s)?;
-
+            let mut doc: Document = serde_json::from_str(&s)?;
+            doc.recompute_hashes();
             let packet = from_document(&doc, tid);
 
             let out = if min {
