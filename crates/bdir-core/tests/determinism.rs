@@ -2,7 +2,13 @@ use bdir_core::model::Document;
 
 #[test]
 fn recompute_hashes_is_deterministic() {
-    let json = std::fs::read_to_string("examples/document.json")
+    let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("..")
+        .join("..")
+        .join("examples")
+        .join("document.json");
+    
+    let json = std::fs::read_to_string(&path)
         .expect("examples/document.json must exist");
 
     let mut doc1: Document = serde_json::from_str(&json).expect("document.json must parse");

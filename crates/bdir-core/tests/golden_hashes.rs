@@ -6,10 +6,16 @@ fn is_hex16(s: &str) -> bool {
 
 #[test]
 fn golden_hashes_example_document_v1() {
+    let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+    .join("..")
+    .join("..")
+    .join("examples")
+    .join("document.json");
+
     // Load the example document JSON from the repo root.
-    // (Adjust the path if your test runs from a different working dir.)
-    let json = std::fs::read_to_string("../examples/document.json")
-        .expect("examples/document.json must exist");
+    let json = std::fs::read_to_string(&path)
+    .expect("examples/document.json must exist");
+
     let mut doc: Document = serde_json::from_str(&json).expect("document.json must parse");
 
     doc.recompute_hashes();
