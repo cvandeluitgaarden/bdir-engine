@@ -15,6 +15,14 @@ pub mod core {
     pub use bdir_core::hash::{canonicalize_text, xxh64_hex};
 }
 
+/// Deterministic JSON canonicalization helpers.
+///
+/// These utilities are used for stable hashing and cache keys.
+pub mod canonical_json;
+
+/// Hash helpers for canonical JSON and cache keys.
+pub mod hashing;
+
 // Re-export edit packet schema + helpers.
 pub mod editpacket {
     pub use bdir_editpacket::schema::{BlockTupleV1, EditPacketV1};
@@ -37,4 +45,5 @@ pub mod prelude {
     pub use crate::core::{Block, BlockId, Document};
     pub use crate::editpacket::{BlockTupleV1, EditPacketV1};
     pub use crate::patch::{OpType, PatchOpV1, PatchV1};
+    pub use crate::{canonical_json, hashing};
 }
