@@ -22,7 +22,7 @@ pub fn apply_patch_against_edit_packet(
     validate_patch_against_edit_packet(packet, patch)?;
 
     // For now we only support xxh64; you can extend later.
-    let algo = packet.ha.as_deref().unwrap_or("xxh64");
+    let algo = packet.ha.as_str();
     if algo != "xxh64" {
         return Err(format!("unsupported hash algorithm '{algo}'"));
     }
@@ -63,10 +63,10 @@ pub fn apply_patch_against_edit_packet(
             }
 
             OpType::InsertAfter => {
-                let after = op
-                    .after
+                let content = op
+                    .content
                     .as_deref()
-                    .ok_or_else(|| "ops insert_after missing after (should be validated)".to_string())?;
+                    .ok_or_else(|| "ops insert_after missing content (should be validated)".to_string())?;
 
                 let anchor_idx = find_block_index(&out.b, &op.block_id)
                     .ok_or_else(|| format!("unknown block_id '{}'", op.block_id))?;
@@ -78,7 +78,7 @@ pub fn apply_patch_against_edit_packet(
                 let new_id = make_insert_id(&out.b, &op.block_id);
 
                 // Placeholder hash, recomputed at the end.
-                let new_tuple: BlockTupleV1 = (new_id, anchor_kind, String::new(), after.to_string());
+                let new_tuple: BlockTupleV1 = (new_id, anchor_kind, String::new(), content.to_string());
 
                 out.b.insert(anchor_idx + 1, new_tuple);
             }
@@ -142,7 +142,7 @@ fn make_insert_id(blocks: &[BlockTupleV1], anchor_id: &str) -> String {
 /// Packet hash input is identical to the Document hash payload you used earlier:
 /// `{blockId}\t{kindCode}\t{textHash}\n` for each block in order.
 fn recompute_edit_packet_hashes(packet: &mut EditPacketV1) {
-    packet.ha = Some("xxh64".to_string());
+    packet.ha = "xxh64".to_string();
 
     // Recompute each block's textHash from canonicalized text.
     for t in &mut packet.b {

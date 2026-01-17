@@ -1,0 +1,51 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "bdir://schemas/patch.v1",
+  "title": "BDIR Patch v1",
+  "type": "object",
+  "required": ["v", "ops"],
+  "additionalProperties": false,
+  "properties": {
+    "v": { "type": "integer", "const": 1 },
+    "ops": {
+      "type": "array",
+      "items": { "$ref": "#/definitions/op" }
+    }
+  },
+  "definitions": {
+    "op": {
+      "type": "object",
+      "required": ["op", "blockId"],
+      "additionalProperties": false,
+      "properties": {
+        "op": {
+          "type": "string",
+          "enum": ["replace", "delete", "insert_after", "suggest"]
+        },
+        "blockId": { "type": "string", "minLength": 1 },
+        "before": { "type": "string" },
+        "after": { "type": "string" },
+        "content": { "type": "string" },
+        "message": { "type": "string" }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "op": { "const": "replace" } } },
+          "then": { "required": ["before", "after"] }
+        },
+        {
+          "if": { "properties": { "op": { "const": "delete" } } },
+          "then": { "required": ["before"] }
+        },
+        {
+          "if": { "properties": { "op": { "const": "insert_after" } } },
+          "then": { "required": ["content"] }
+        },
+        {
+          "if": { "properties": { "op": { "const": "suggest" } } },
+          "then": { "required": ["message"] }
+        }
+      ]
+    }
+  }
+}

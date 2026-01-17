@@ -58,11 +58,14 @@ pub fn validate_patch(doc: &Document, patch: &PatchV1) -> Result<(), String> {
             }
 
             OpType::InsertAfter => {
-                let _after = op
-                    .after
+                let _content = op
+                    .content
                     .as_deref()
-                    .ok_or_else(|| format!("ops[{i}] (insert_after) missing after"))?;
+                    .ok_or_else(|| format!("ops[{i}] (insert_after) missing content"))?;
                 // No `before` required; insertion is anchored by block_id + position.
+                if _content.trim().is_empty() {
+                    return Err(format!("ops[{i}] (insert_after) content is empty"));
+                }
             }
 
             OpType::Suggest => {
@@ -148,10 +151,13 @@ pub fn validate_patch_against_edit_packet(packet: &EditPacketV1, patch: &PatchV1
             }
 
             OpType::InsertAfter => {
-                let _after = op
-                    .after
+                let content = op
+                    .content
                     .as_deref()
-                    .ok_or_else(|| format!("ops[{i}] (insert_after) missing after"))?;
+                    .ok_or_else(|| format!("ops[{i}] (insert_after) missing content"))?;
+                if content.trim().is_empty() {
+                    return Err(format!("ops[{i}] (insert_after) content is empty"));
+                }
             }
 
             OpType::Suggest => {

@@ -1,0 +1,60 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "bdir://schemas/edit-packet.v1",
+  "title": "BDIR Edit Packet v1",
+  "type": "object",
+  "required": [
+    "v",
+    "h",
+    "ha",
+    "b"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "v": {
+      "type": "integer",
+      "const": 1
+    },
+    "tid": {
+      "type": "string"
+    },
+    "h": {
+      "type": "string",
+      "minLength": 1
+    },
+    "ha": {
+      "type": "string",
+      "enum": [
+        "xxh64",
+        "sha256"
+      ]
+    },
+    "b": {
+      "type": "array",
+      "items": {
+        "type": "array",
+        "minItems": 4,
+        "maxItems": 4,
+        "prefixItems": [
+          {
+            "type": "string",
+            "minLength": 1
+          },
+          {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 255
+          },
+          {
+            "type": "string",
+            "minLength": 1
+          },
+          {
+            "type": "string"
+          }
+        ],
+        "items": false
+      }
+    }
+  }
+}

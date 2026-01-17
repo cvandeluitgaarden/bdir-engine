@@ -3,7 +3,7 @@
   "ops": [
     {
       "op": "replace",
-      "block_id": "does_not_exist",
+      "blockId": "does_not_exist",
       "before": "example paragraph",
       "after": "example paragraph"
     }

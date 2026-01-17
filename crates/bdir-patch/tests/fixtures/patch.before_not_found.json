@@ -3,7 +3,7 @@
   "ops": [
     {
       "op": "delete",
-      "block_id": "p1",
+      "blockId": "p1",
       "before": "this substring is not present"
     }
   ]

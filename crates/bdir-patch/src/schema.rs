@@ -15,9 +15,16 @@ pub enum OpType {
     Suggest,
 }
 
+/// Patch operation in RFC-0001 v1 wire format.
+///
+/// Field naming:
+/// - `blockId` in JSON, `block_id` in Rust.
+/// - `content` is used for `insert_after`.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PatchOpV1 {
     pub op: OpType,
+
+    #[serde(rename = "blockId")]
     pub block_id: String,
 
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -25,6 +32,9 @@ pub struct PatchOpV1 {
 
     #[serde(skip_serializing_if = "Option::is_none")]
     pub after: Option<String>,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub content: Option<String>,
 
     #[serde(skip_serializing_if = "Option::is_none")]
     pub message: Option<String>,

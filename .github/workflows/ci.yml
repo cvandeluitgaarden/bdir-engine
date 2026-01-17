@@ -78,3 +78,71 @@ jobs:
             echo "  protocol(bdir-patch): ..."
             exit 1
           fi
+
+  rfc-guard:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout (full history)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Detect RFC/spec changes
+        id: rfc
+        run: |
+          set -euo pipefail
+          BASE="${{ github.event.pull_request.base.sha }}"
+          HEAD="${{ github.event.pull_request.head.sha }}"
+
+          CHANGED="$(git diff --name-only "$BASE" "$HEAD" -- RFC spec || true)"
+          if [ -n "$CHANGED" ]; then
+            echo "rfc_changed=true" >> $GITHUB_OUTPUT
+          else
+            echo "rfc_changed=false" >> $GITHUB_OUTPUT
+          fi
+
+          echo "changed<<EOF" >> $GITHUB_OUTPUT
+          echo "$CHANGED" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: Require version gating when RFC/spec changes
+        if: steps.rfc.outputs.rfc_changed == 'true'
+        run: |
+          set -euo pipefail
+          BASE="${{ github.event.pull_request.base.sha }}"
+          HEAD="${{ github.event.pull_request.head.sha }}"
+
+          echo "RFC/spec changed:" 
+          echo "${{ steps.rfc.outputs.changed }}"
+          echo ""
+
+          # Require updating either the schema bundle version constant or the bdir-io crate version.
+          VERSION_CHANGED="$(git diff --name-only "$BASE" "$HEAD" -- crates/bdir-io/src/version.rs crates/bdir-io/Cargo.toml || true)"
+
+          if [ -n "$VERSION_CHANGED" ]; then
+            echo "OK: version gating updated (version.rs and/or Cargo.toml)."
+          else
+            echo "ERROR: RFC/spec changed, but version gating was not updated."
+            echo "Update at least one of:"
+            echo "  - crates/bdir-io/src/version.rs (SCHEMA_BUNDLE_V / protocol constants)"
+            echo "  - crates/bdir-io/Cargo.toml (crate version)"
+            exit 1
+          fi
+
+      - name: Require protocol commit prefix when RFC/spec changes
+        if: steps.rfc.outputs.rfc_changed == 'true'
+        run: |
+          set -euo pipefail
+          BASE="${{ github.event.pull_request.base.sha }}"
+          HEAD="${{ github.event.pull_request.head.sha }}"
+
+          COMMITS="$(git log --format=%s "$BASE..$HEAD")"
+          if echo "$COMMITS" | grep -Eq '^protocol\(rfc\):'; then
+            echo "OK: RFC change declared."
+          else
+            echo "ERROR: RFC/spec changed, but no commit message declares an RFC change."
+            echo "Add a commit with subject starting with:"
+            echo "  protocol(rfc): ..."
+            exit 1
+          fi

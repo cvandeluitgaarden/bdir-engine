@@ -3,7 +3,7 @@
   "ops": [
     {
       "op": "replace",
-      "block_id": "p1",
+      "blockId": "p1",
       "before": "example paragraph with a typo"
     }
   ]

@@ -14,7 +14,7 @@ pub fn from_document(doc: &Document, tid: Option<String>) -> EditPacketV1 {
         v: 1,
         tid,
         h: doc.page_hash.clone(),
-        ha: Some(doc.hash_algorithm.clone()),
+        ha: doc.hash_algorithm.clone(),
         b: blocks,
     }
 }

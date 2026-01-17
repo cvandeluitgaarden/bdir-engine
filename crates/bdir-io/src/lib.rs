@@ -32,6 +32,9 @@ pub mod canonical_json;
 /// Hash helpers for canonical JSON and cache keys.
 pub mod hashing;
 
+/// Version constants for RFC conformance and CI gating.
+pub mod version;
+
 // Re-export edit packet schema + helpers.
 #[doc(hidden)]
 pub mod editpacket {
