@@ -1,5 +1,4 @@
 use clap::{Parser, Subcommand};
-use std::process;
 use std::fs;
 
 use bdir_core::model::Document;
@@ -26,11 +25,12 @@ enum Command {
         min: bool,
     },
     ValidatePatch {
-        /// Input Document JSON path (bdir-core::Document)
-        document: String,
+        /// Input Edit Packet JSON path (bdir-patch::EditPacketV1)
+        edit_packet: String,
         /// Patch JSON path (bdir-patch::PatchV1)
         patch: String,
     },
+
 }
 
 fn main() -> anyhow::Result<()> {
@@ -51,54 +51,34 @@ fn main() -> anyhow::Result<()> {
 
             println!("{out}");
         },
-        Command::ValidatePatch { document, patch } => {
-            let doc_s = match fs::read_to_string(&document) {
+        Command::ValidatePatch { edit_packet, patch } => {
+            use std::process;
+
+            let packet_s = match fs::read_to_string(&edit_packet) {
                 Ok(s) => s,
-                Err(e) => {
-                    eprintln!("{e}");
-                    process::exit(1);
-                }
+                Err(e) => { eprintln!("{e}"); process::exit(1); }
             };
-
-            let mut doc: Document = match serde_json::from_str(&doc_s) {
-                Ok(d) => d,
-                Err(e) => {
-                    eprintln!("{e}");
-                    process::exit(1);
-                }
+        
+            let packet: bdir_patch::EditPacketV1 = match serde_json::from_str(&packet_s) {
+                Ok(p) => p,
+                Err(e) => { eprintln!("{e}"); process::exit(1); }
             };
-
-            // Ensure hashes are consistent with current text.
-            doc.recompute_hashes();
-
+        
             let patch_s = match fs::read_to_string(&patch) {
                 Ok(s) => s,
-                Err(e) => {
-                    eprintln!("{e}");
-                    process::exit(1);
-                }
+                Err(e) => { eprintln!("{e}"); process::exit(1); }
             };
-
+        
             let patch: bdir_patch::PatchV1 = match serde_json::from_str(&patch_s) {
                 Ok(p) => p,
-                Err(e) => {
-                    eprintln!("{e}");
-                    process::exit(1);
-                }
+                Err(e) => { eprintln!("{e}"); process::exit(1); }
             };
-
-            match bdir_patch::validate_patch(&doc, &patch) {
-                Ok(()) => {
-                    println!("OK");
-                    process::exit(0);
-                }
-                Err(msg) => {
-                    // Exact error string, stable for CI / integrations.
-                    eprintln!("{msg}");
-                    process::exit(2);
-                }
+        
+            match bdir_patch::validate_patch_against_edit_packet(&packet, &patch) {
+                Ok(()) => { println!("OK"); process::exit(0); }
+                Err(msg) => { eprintln!("{msg}"); process::exit(2); }
             }
-        }   
+        }
     }
 
     Ok(())

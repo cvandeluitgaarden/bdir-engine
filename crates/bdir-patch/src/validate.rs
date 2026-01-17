@@ -1,6 +1,6 @@
 use bdir_core::model::Document;
 
-use crate::schema::{OpType, PatchV1};
+use crate::{EditPacketV1, schema::{OpType, PatchV1}};
 
 /// Validate a patch against a document. Strict and fail-fast.
 ///
@@ -91,5 +91,80 @@ fn guard_before(i: usize, before: &str) -> Result<(), String> {
             "ops[{i}] before is too short (<{MIN_BEFORE_LEN} chars); likely ambiguous"
         ));
     }
+    Ok(())
+}
+
+pub fn validate_patch_against_edit_packet(packet: &EditPacketV1, patch: &PatchV1) -> Result<(), String> {
+    if patch.v != 1 {
+        return Err(format!("unsupported patch version {}", patch.v));
+    }
+    if packet.v != 1 {
+        return Err(format!("unsupported edit packet version {}", packet.v));
+    }
+
+    for (i, op) in patch.ops.iter().enumerate() {
+        let block = packet
+            .b
+            .iter()
+            .find(|t| t.0 == op.block_id)
+            .ok_or_else(|| format!("ops[{i}] references unknown block_id '{}'", op.block_id))?;
+
+        // tuple layout: (id, kind, text_hash, text)
+        let block_text = &block.3;
+
+        match op.op {
+            OpType::Replace => {
+                let before = op
+                    .before
+                    .as_deref()
+                    .ok_or_else(|| format!("ops[{i}] (replace) missing before"))?;
+                let _after = op
+                    .after
+                    .as_deref()
+                    .ok_or_else(|| format!("ops[{i}] (replace) missing after"))?;
+
+                guard_before(i, before)?;
+                if !block_text.contains(before) {
+                    return Err(format!(
+                        "ops[{i}] (replace) before substring not found in block '{}'",
+                        op.block_id
+                    ));
+                }
+            }
+
+            OpType::Delete => {
+                let before = op
+                    .before
+                    .as_deref()
+                    .ok_or_else(|| format!("ops[{i}] (delete) missing before"))?;
+
+                guard_before(i, before)?;
+                if !block_text.contains(before) {
+                    return Err(format!(
+                        "ops[{i}] (delete) before substring not found in block '{}'",
+                        op.block_id
+                    ));
+                }
+            }
+
+            OpType::InsertAfter => {
+                let _after = op
+                    .after
+                    .as_deref()
+                    .ok_or_else(|| format!("ops[{i}] (insert_after) missing after"))?;
+            }
+
+            OpType::Suggest => {
+                let msg = op
+                    .message
+                    .as_deref()
+                    .ok_or_else(|| format!("ops[{i}] (suggest) missing message"))?;
+                if msg.trim().is_empty() {
+                    return Err(format!("ops[{i}] (suggest) message is empty"));
+                }
+            }
+        }
+    }
+
     Ok(())
 }
