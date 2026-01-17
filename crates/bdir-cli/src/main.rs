@@ -1,7 +1,6 @@
-use bdir_core::model::Document;
 use clap::{Parser, Subcommand};
 use std::fs;
-use bdir_editpacket::{convert::from_document, serialize};
+use bdir_io::{core::Document, editpacket, patch};
 
 #[derive(Debug, Parser)]
 #[command(name = "bdir", version, about = "BDIR Patch Protocol MVP CLI")]
@@ -48,12 +47,12 @@ fn main() -> anyhow::Result<()> {
             let s = fs::read_to_string(&input)?;
             let mut doc: Document = serde_json::from_str(&s)?;
             doc.recompute_hashes();
-            let packet = from_document(&doc, tid);
+            let packet = editpacket::from_document(&doc, tid);
 
             let out = if min {
-                serialize::to_minified_json(&packet)?
+                editpacket::to_minified_json(&packet)?
             } else {
-                serialize::to_pretty_json(&packet)?
+                editpacket::to_pretty_json(&packet)?
             };
 
             println!("{out}");
@@ -66,7 +65,7 @@ fn main() -> anyhow::Result<()> {
                 Err(e) => { eprintln!("{e}"); process::exit(1); }
             };
         
-            let packet: bdir_editpacket::EditPacketV1 = match serde_json::from_str(&packet_s) {
+            let packet: editpacket::EditPacketV1 = match serde_json::from_str(&packet_s) {
                 Ok(p) => p,
                 Err(e) => { eprintln!("{e}"); process::exit(1); }
             };
@@ -76,12 +75,12 @@ fn main() -> anyhow::Result<()> {
                 Err(e) => { eprintln!("{e}"); process::exit(1); }
             };
         
-            let patch: bdir_patch::PatchV1 = match serde_json::from_str(&patch_s) {
+            let patch: patch::PatchV1 = match serde_json::from_str(&patch_s) {
                 Ok(p) => p,
                 Err(e) => { eprintln!("{e}"); process::exit(1); }
             };
         
-            match bdir_patch::validate_patch_against_edit_packet(&packet, &patch) {
+            match patch::validate_patch_against_edit_packet(&packet, &patch) {
                 Ok(()) => { println!("OK"); process::exit(0); }
                 Err(msg) => { eprintln!("{msg}"); process::exit(2); }
             }
@@ -95,7 +94,7 @@ fn main() -> anyhow::Result<()> {
             };
         
             // NOTE: deserialize using the canonical EditPacket type
-            let packet: bdir_editpacket::EditPacketV1 = match serde_json::from_str(&packet_s) {
+            let packet: editpacket::EditPacketV1 = match serde_json::from_str(&packet_s) {
                 Ok(p) => p,
                 Err(e) => { eprintln!("{e}"); process::exit(1); }
             };
@@ -105,20 +104,20 @@ fn main() -> anyhow::Result<()> {
                 Err(e) => { eprintln!("{e}"); process::exit(1); }
             };
         
-            let patch: bdir_patch::PatchV1 = match serde_json::from_str(&patch_s) {
+            let patch: patch::PatchV1 = match serde_json::from_str(&patch_s) {
                 Ok(p) => p,
                 Err(e) => { eprintln!("{e}"); process::exit(1); }
             };
         
-            let updated = match bdir_patch::apply_patch_against_edit_packet(&packet, &patch) {
+            let updated = match patch::apply_patch_against_edit_packet(&packet, &patch) {
                 Ok(p) => p,
                 Err(msg) => { eprintln!("{msg}"); process::exit(2); }
             };
         
             let out = if min {
-                bdir_editpacket::serialize::to_minified_json(&updated).unwrap()
+                editpacket::to_minified_json(&updated).unwrap()
             } else {
-                bdir_editpacket::serialize::to_pretty_json(&updated).unwrap()
+                editpacket::to_pretty_json(&updated).unwrap()
             };
         
             // keep newline behavior stable
