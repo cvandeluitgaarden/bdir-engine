@@ -13,3 +13,4 @@ serde_json = "1"
 bdir-core = { path = "../bdir-core" }
 bdir-editpacket = { path = "../bdir-editpacket" }
 anyhow = "1"
+assert_cmd = "2.1.2"
