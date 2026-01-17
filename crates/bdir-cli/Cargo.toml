@@ -15,3 +15,7 @@ bdir-editpacket = { path = "../bdir-editpacket" }
 bdir-patch = { path = "../bdir-patch" }
 anyhow = "1"
 assert_cmd = "2.1.2"
+
+[dev-dependencies]
+assert_cmd = "2.1.2"
+predicates = "3"
