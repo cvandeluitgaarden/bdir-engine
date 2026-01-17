@@ -1,3 +1,4 @@
+use bdir_patch::{PatchV1, validate_patch};
 use clap::{Parser, Subcommand};
 use std::fs;
 
@@ -24,6 +25,12 @@ enum Command {
         #[arg(long)]
         min: bool,
     },
+    ValidatePatch {
+        /// Input Document JSON path (bdir-core::Document)
+        document: String,
+        /// Patch JSON path (bdir-patch::PatchV1)
+        patch: String,
+    },
 }
 
 fn main() -> anyhow::Result<()> {
@@ -43,6 +50,19 @@ fn main() -> anyhow::Result<()> {
             };
 
             println!("{out}");
+        },
+        Command::ValidatePatch { document, patch } => {
+            let doc_s = fs::read_to_string(&document)?;
+            let mut doc: Document = serde_json::from_str(&doc_s)?;
+            doc.recompute_hashes();
+
+            let patch_s = fs::read_to_string(&patch)?;
+            let patch: PatchV1 = serde_json::from_str(&patch_s)?;
+
+            validate_patch(&doc, &patch).map_err(anyhow::Error::msg)?;
+
+            // Intentionally minimal output; stable for scripts.
+            println!("OK");
         }
     }
 
