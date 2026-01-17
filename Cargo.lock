@@ -81,6 +81,7 @@ dependencies = [
  "assert_cmd",
  "bdir-core",
  "bdir-editpacket",
+ "bdir-patch",
  "clap",
  "serde_json",
 ]
@@ -97,6 +98,15 @@ dependencies = [
 
 [[package]]
 name = "bdir-editpacket"
+version = "0.1.0"
+dependencies = [
+ "bdir-core",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
+name = "bdir-patch"
 version = "0.1.0"
 dependencies = [
  "bdir-core",
