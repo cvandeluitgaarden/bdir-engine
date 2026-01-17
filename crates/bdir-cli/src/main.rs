@@ -1,5 +1,5 @@
-use bdir_patch::{PatchV1, validate_patch};
 use clap::{Parser, Subcommand};
+use std::process;
 use std::fs;
 
 use bdir_core::model::Document;
@@ -52,18 +52,53 @@ fn main() -> anyhow::Result<()> {
             println!("{out}");
         },
         Command::ValidatePatch { document, patch } => {
-            let doc_s = fs::read_to_string(&document)?;
-            let mut doc: Document = serde_json::from_str(&doc_s)?;
+            let doc_s = match fs::read_to_string(&document) {
+                Ok(s) => s,
+                Err(e) => {
+                    eprintln!("{e}");
+                    process::exit(1);
+                }
+            };
+
+            let mut doc: Document = match serde_json::from_str(&doc_s) {
+                Ok(d) => d,
+                Err(e) => {
+                    eprintln!("{e}");
+                    process::exit(1);
+                }
+            };
+
+            // Ensure hashes are consistent with current text.
             doc.recompute_hashes();
 
-            let patch_s = fs::read_to_string(&patch)?;
-            let patch: PatchV1 = serde_json::from_str(&patch_s)?;
+            let patch_s = match fs::read_to_string(&patch) {
+                Ok(s) => s,
+                Err(e) => {
+                    eprintln!("{e}");
+                    process::exit(1);
+                }
+            };
 
-            validate_patch(&doc, &patch).map_err(anyhow::Error::msg)?;
+            let patch: bdir_patch::PatchV1 = match serde_json::from_str(&patch_s) {
+                Ok(p) => p,
+                Err(e) => {
+                    eprintln!("{e}");
+                    process::exit(1);
+                }
+            };
 
-            // Intentionally minimal output; stable for scripts.
-            println!("OK");
-        }
+            match bdir_patch::validate_patch(&doc, &patch) {
+                Ok(()) => {
+                    println!("OK");
+                    process::exit(0);
+                }
+                Err(msg) => {
+                    // Exact error string, stable for CI / integrations.
+                    eprintln!("{msg}");
+                    process::exit(2);
+                }
+            }
+        }   
     }
 
     Ok(())
