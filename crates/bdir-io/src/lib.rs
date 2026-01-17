@@ -1,4 +1,4 @@
-//! `bdir-io` is the single public entrypoint for the BDIR Patch Protocol wire types
+//! `bdir-io` is the single supported public entrypoint for the BDIR Patch Protocol wire types
 //! and deterministic helpers (edit packet generation, patch validation, and patch
 //! application).
 //!
@@ -9,7 +9,16 @@
 //! - hashing
 //! - validation / application helpers
 
+// -----------------------------------------------------------------------------
+// Public API contract
+// -----------------------------------------------------------------------------
+//
+// Consumers SHOULD import from `bdir_io::prelude::*`.
+// Anything not re-exported via the prelude is considered internal and may change
+// without notice.
+
 // Re-export the canonical document model.
+#[doc(hidden)]
 pub mod core {
     pub use bdir_core::model::{Block, BlockId, Document};
     pub use bdir_core::hash::{canonicalize_text, xxh64_hex};
@@ -24,6 +33,7 @@ pub mod canonical_json;
 pub mod hashing;
 
 // Re-export edit packet schema + helpers.
+#[doc(hidden)]
 pub mod editpacket {
     pub use bdir_editpacket::schema::{BlockTupleV1, EditPacketV1};
     pub use bdir_editpacket::convert::from_document;
@@ -31,6 +41,7 @@ pub mod editpacket {
 }
 
 // Re-export patch schema + helpers.
+#[doc(hidden)]
 pub mod patch {
     pub use bdir_patch::schema::{OpType, PatchOpV1, PatchV1};
     pub use bdir_patch::{
@@ -41,9 +52,23 @@ pub mod patch {
 }
 
 /// Convenience prelude for consumers.
+///
+/// This is the **only supported** import surface for external users.
 pub mod prelude {
     pub use crate::core::{Block, BlockId, Document};
     pub use crate::editpacket::{BlockTupleV1, EditPacketV1};
     pub use crate::patch::{OpType, PatchOpV1, PatchV1};
     pub use crate::{canonical_json, hashing};
+}
+
+/// Internal validation helpers.
+#[doc(hidden)]
+pub mod validate {
+    pub use bdir_patch::{validate_patch, validate_patch_against_edit_packet};
+}
+
+/// Internal application helpers.
+#[doc(hidden)]
+pub mod apply {
+    pub use bdir_patch::apply_patch_against_edit_packet;
 }
