@@ -1,3 +1,11 @@
+//! ⚠️ GOLDEN TESTS – PROTOCOL CONTRACT ⚠️
+//!
+//! These tests define the frozen, externally visible semantics of
+//! `apply_patch_against_edit_packet`.
+//!
+//! Any change here MUST be intentional and reviewed as a protocol change.
+//! If a test fails, fix the implementation – do not update expectations
+//! unless the protocol itself is evolving.
 
 use serde_json::json;
 

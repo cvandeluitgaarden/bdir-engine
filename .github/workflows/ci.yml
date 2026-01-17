@@ -1,8 +1,9 @@
 name: CI
 
 on:
-  push:
   pull_request:
+  push:
+    branches: [ main, master ]
 
 jobs:
   test:
@@ -10,12 +11,70 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
-      - name: Install Rust (stable)
+      - name: Set up Rust
         uses: dtolnay/rust-toolchain@stable
 
-      - name: Cache cargo
-        uses: Swatinem/rust-cache@v2
+      - name: Run tests (freeze snapshots)
+        run: |
+          INSTA_UPDATE=never cargo test --workspace
 
-      - name: Run tests
-        run: cargo test --workspace
+      - name: Ensure tests did not mutate golden files
+        run: |
+          git diff --exit-code crates/bdir-patch/tests
+
+  protocol-guard:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout (full history)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Detect golden changes
+        id: golden
+        run: |
+          set -euo pipefail
+          BASE="${{ github.event.pull_request.base.sha }}"
+          HEAD="${{ github.event.pull_request.head.sha }}"
+
+          CHANGED="$(git diff --name-only "$BASE" "$HEAD" -- crates/bdir-patch/tests || true)"
+          if [ -n "$CHANGED" ]; then
+            echo "golden_changed=true" >> $GITHUB_OUTPUT
+          else
+            echo "golden_changed=false" >> $GITHUB_OUTPUT
+          fi
+
+          echo "changed<<EOF" >> $GITHUB_OUTPUT
+          echo "$CHANGED" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: Enforce protocol commit prefix if goldens changed
+        if: steps.golden.outputs.golden_changed == 'true'
+        run: |
+          set -euo pipefail
+          BASE="${{ github.event.pull_request.base.sha }}"
+          HEAD="${{ github.event.pull_request.head.sha }}"
+
+          echo "Golden files changed:"
+          echo "${{ steps.golden.outputs.changed }}"
+          echo ""
+
+          # List commit subjects in the PR range
+          COMMITS="$(git log --format=%s "$BASE..$HEAD")"
+          echo "Commits in PR:"
+          echo "$COMMITS"
+          echo ""
+
+          # Require at least one commit message explicitly declaring protocol change
+          if echo "$COMMITS" | grep -Eq '^protocol\(bdir-patch\):'; then
+            echo "OK: protocol change declared."
+          else
+            echo "ERROR: Golden tests changed, but no commit message declares a protocol change."
+            echo "Add a commit with subject starting with:"
+            echo "  protocol(bdir-patch): ..."
+            exit 1
+          fi
