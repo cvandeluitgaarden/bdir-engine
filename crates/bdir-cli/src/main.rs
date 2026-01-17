@@ -1,7 +1,6 @@
+use bdir_core::model::Document;
 use clap::{Parser, Subcommand};
 use std::fs;
-
-use bdir_core::model::Document;
 use bdir_editpacket::{convert::from_document, serialize};
 
 #[derive(Debug, Parser)]
@@ -30,7 +29,15 @@ enum Command {
         /// Patch JSON path (bdir-patch::PatchV1)
         patch: String,
     },
-
+    ApplyPatch {
+        /// Input Edit Packet JSON path (bdir-patch::EditPacketV1)
+        edit_packet: String,
+        /// Patch JSON path (bdir-patch::PatchV1)
+        patch: String,
+        /// Output minified JSON
+        #[arg(long)]
+        min: bool,
+    },  
 }
 
 fn main() -> anyhow::Result<()> {
@@ -59,7 +66,7 @@ fn main() -> anyhow::Result<()> {
                 Err(e) => { eprintln!("{e}"); process::exit(1); }
             };
         
-            let packet: bdir_patch::EditPacketV1 = match serde_json::from_str(&packet_s) {
+            let packet: bdir_editpacket::EditPacketV1 = match serde_json::from_str(&packet_s) {
                 Ok(p) => p,
                 Err(e) => { eprintln!("{e}"); process::exit(1); }
             };
@@ -78,7 +85,46 @@ fn main() -> anyhow::Result<()> {
                 Ok(()) => { println!("OK"); process::exit(0); }
                 Err(msg) => { eprintln!("{msg}"); process::exit(2); }
             }
-        }
+        },
+        Command::ApplyPatch { edit_packet, patch, min } => {
+            use std::process;
+                
+            let packet_s = match fs::read_to_string(&edit_packet) {
+                Ok(s) => s,
+                Err(e) => { eprintln!("{e}"); process::exit(1); }
+            };
+        
+            // NOTE: deserialize using the canonical EditPacket type
+            let packet: bdir_editpacket::EditPacketV1 = match serde_json::from_str(&packet_s) {
+                Ok(p) => p,
+                Err(e) => { eprintln!("{e}"); process::exit(1); }
+            };
+        
+            let patch_s = match fs::read_to_string(&patch) {
+                Ok(s) => s,
+                Err(e) => { eprintln!("{e}"); process::exit(1); }
+            };
+        
+            let patch: bdir_patch::PatchV1 = match serde_json::from_str(&patch_s) {
+                Ok(p) => p,
+                Err(e) => { eprintln!("{e}"); process::exit(1); }
+            };
+        
+            let updated = match bdir_patch::apply_patch_against_edit_packet(&packet, &patch) {
+                Ok(p) => p,
+                Err(msg) => { eprintln!("{msg}"); process::exit(2); }
+            };
+        
+            let out = if min {
+                bdir_editpacket::serialize::to_minified_json(&updated).unwrap()
+            } else {
+                bdir_editpacket::serialize::to_pretty_json(&updated).unwrap()
+            };
+        
+            // keep newline behavior stable
+            println!("{out}");
+            process::exit(0);
+        },            
     }
 
     Ok(())
