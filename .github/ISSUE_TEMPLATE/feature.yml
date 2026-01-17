@@ -1,0 +1,56 @@
+name: "Feature / Enhancement"
+description: "Add a new feature or extend existing functionality"
+title: "[Feature]: "
+labels: ["enhancement"]
+body:
+  - type: dropdown
+    id: crate
+    attributes:
+      label: Affected crate
+      options:
+        - bdir-core
+        - bdir-patch
+        - bdir-cli
+        - bdir-codebook
+        - documentation
+        - other
+    validations:
+      required: true
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem statement
+      description: What is missing or insufficient today?
+      placeholder: >
+        Describe the concrete limitation in the current implementation.
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposed
+    attributes:
+      label: Proposed change
+      description: What should be implemented?
+      placeholder: >
+        Describe the intended behavior and scope.
+    validations:
+      required: true
+
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance criteria
+      description: Clear, testable conditions for completion
+      placeholder: |
+        - [ ] Behavior X works
+        - [ ] Backward compatibility preserved
+        - [ ] Tests added
+    validations:
+      required: true
+
+  - type: textarea
+    id: notes
+    attributes:
+      label: Notes / references
+      description: RFC sections, design notes, or related issues

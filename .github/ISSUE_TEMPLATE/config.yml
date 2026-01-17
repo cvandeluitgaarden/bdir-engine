@@ -1,0 +1,5 @@
+blank_issues_enabled: false
+contact_links:
+  - name: RFC / Protocol Questions
+    url: https://github.com/cvandeluitgaarden/bdir-engine/tree/main/RFC
+    about: Read the BDIR Patch Protocol before filing protocol-level issues.

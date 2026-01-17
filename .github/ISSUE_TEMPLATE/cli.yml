@@ -1,0 +1,44 @@
+name: "CLI / UX Improvement"
+description: "Improve CLI usability, workflow, or ergonomics"
+title: "[CLI]: "
+labels: ["cli", "ux"]
+body:
+  - type: dropdown
+    id: command
+    attributes:
+      label: CLI area
+      options:
+        - inspect
+        - edit-packet
+        - apply-patch
+        - validate-patch
+        - new command
+    validations:
+      required: true
+
+  - type: textarea
+    id: pain
+    attributes:
+      label: User pain point
+      description: What makes the current CLI awkward or incomplete?
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed UX
+      description: Describe flags, output, or workflows
+    validations:
+      required: true
+
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance criteria
+      placeholder: |
+        - [ ] Command documented
+        - [ ] Output is deterministic
+        - [ ] Errors are actionable
+    validations:
+      required: true

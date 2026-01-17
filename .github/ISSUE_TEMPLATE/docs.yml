@@ -1,0 +1,30 @@
+name: "Documentation"
+description: "Missing, unclear, or outdated documentation"
+title: "[Docs]: "
+labels: ["documentation"]
+body:
+  - type: textarea
+    id: gap
+    attributes:
+      label: Documentation gap
+      description: What is unclear or missing?
+    validations:
+      required: true
+
+  - type: textarea
+    id: audience
+    attributes:
+      label: Intended audience
+      description: Who is this documentation for?
+      placeholder: implementers / contributors / users / reviewers
+    validations:
+      required: true
+
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance criteria
+      placeholder: |
+        - [ ] New doc added
+        - [ ] Linked from README
+        - [ ] Matches current implementation

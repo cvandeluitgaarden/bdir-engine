@@ -1,0 +1,53 @@
+name: "Safety / Correctness"
+description: "Issues affecting determinism, validation, or protocol safety"
+title: "[Safety]: "
+labels: ["safety", "bug"]
+body:
+  - type: dropdown
+    id: crate
+    attributes:
+      label: Affected crate
+      options:
+        - bdir-core
+        - bdir-patch
+        - bdir-cli
+        - bdir-codebook
+    validations:
+      required: true
+
+  - type: textarea
+    id: risk
+    attributes:
+      label: Risk description
+      description: What could go wrong if this is not fixed?
+      placeholder: >
+        Describe safety, determinism, or validation risks.
+    validations:
+      required: true
+
+  - type: textarea
+    id: current
+    attributes:
+      label: Current behavior
+      description: What happens today?
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+      description: What should happen instead?
+    validations:
+      required: true
+
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance criteria
+      placeholder: |
+        - [ ] Validation rejects invalid input
+        - [ ] Behavior is deterministic
+        - [ ] Covered by tests
+    validations:
+      required: true

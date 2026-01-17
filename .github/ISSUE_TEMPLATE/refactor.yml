@@ -1,0 +1,42 @@
+name: "Refactor / Cleanup"
+description: "Internal improvements without behavior change"
+title: "[Refactor]: "
+labels: ["refactor"]
+body:
+  - type: dropdown
+    id: crate
+    attributes:
+      label: Affected crate
+      options:
+        - bdir-core
+        - bdir-patch
+        - bdir-cli
+        - other
+    validations:
+      required: true
+
+  - type: textarea
+    id: motivation
+    attributes:
+      label: Motivation
+      description: Why is this refactor needed?
+    validations:
+      required: true
+
+  - type: textarea
+    id: non_goals
+    attributes:
+      label: Non-goals
+      description: What should NOT change?
+      placeholder: No protocol or behavior changes.
+    validations:
+      required: true
+
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance criteria
+      placeholder: |
+        - [ ] Behavior unchanged
+        - [ ] Tests still pass
+        - [ ] Code clarity improved
