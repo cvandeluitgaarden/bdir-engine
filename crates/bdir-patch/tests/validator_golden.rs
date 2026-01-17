@@ -58,3 +58,31 @@ fn before_too_short_fails_with_stable_message() {
         "ops[0] before is too short (<8 chars); likely ambiguous"
     );
 }
+
+#[test]
+fn unsupported_version_fails_with_stable_message() {
+    let doc = load_doc();
+    let patch = load_patch("patch.unsupported_version.json");
+
+    let err = validate_patch(&doc, &patch).unwrap_err();
+    assert_eq!(err, "unsupported patch version 2");
+}
+
+#[test]
+fn replace_missing_after_fails_with_stable_message() {
+    let doc = load_doc();
+    let patch = load_patch("patch.replace_missing_after.json");
+
+    let err = validate_patch(&doc, &patch).unwrap_err();
+    assert_eq!(err, "ops[0] (replace) missing after");
+}
+
+#[test]
+fn suggest_empty_message_fails_with_stable_message() {
+    let doc = load_doc();
+    let patch = load_patch("patch.suggest_empty_message.json");
+
+    let err = validate_patch(&doc, &patch).unwrap_err();
+    assert_eq!(err, "ops[0] (suggest) message is empty");
+}
+
