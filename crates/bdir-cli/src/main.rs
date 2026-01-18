@@ -1,5 +1,6 @@
 use clap::{Parser, Subcommand};
 use std::fs;
+
 use bdir_io::{core::Document, editpacket, patch};
 
 const INSPECT_PREVIEW_MAX_CHARS: usize = 80;
@@ -30,6 +31,7 @@ enum Command {
         #[arg(long)]
         grep: Option<String>,
     },
+
     /// Convert a Document JSON into an Edit Packet JSON.
     EditPacket {
         /// Input Document JSON path (bdir-core::Document)
@@ -41,28 +43,55 @@ enum Command {
         #[arg(long)]
         min: bool,
     },
+
     ValidatePatch {
         /// Input Edit Packet JSON path (bdir-patch::EditPacketV1)
         edit_packet: String,
         /// Patch JSON path (bdir-patch::PatchV1)
         patch: String,
     },
+
+    /// Apply a Patch.
+    ///
+    /// Backward-compatible (Edit Packet in/out):
+    ///   bdir apply-patch <edit-packet.json> <patch.json> [--min]
+    ///
+    /// Document JSON in/out:
+    ///   bdir apply-patch --doc <input.document.json> --patch <patch.json> --out <updated.document.json> [--min]
     ApplyPatch {
         /// Input Edit Packet JSON path (bdir-patch::EditPacketV1)
-        edit_packet: String,
+        edit_packet: Option<String>,
         /// Patch JSON path (bdir-patch::PatchV1)
-        patch: String,
+        patch_pos: Option<String>,
+
+        /// Input Document JSON path (bdir-core::Document)
+        #[arg(long)]
+        doc: Option<String>,
+
+        /// Patch JSON path (bdir-patch::PatchV1)
+        #[arg(long = "patch")]
+        patch_flag: Option<String>,
+
+        /// Output file path (required for --doc mode). If omitted, prints to stdout.
+        #[arg(long)]
+        out: Option<String>,
+
         /// Output minified JSON
         #[arg(long)]
         min: bool,
-    },  
+    },
 }
 
 fn main() -> anyhow::Result<()> {
     let cli = Cli::parse();
 
     match cli.cmd {
-        Command::Inspect { input, kind_filters, id, grep } => {
+        Command::Inspect {
+            input,
+            kind_filters,
+            id,
+            grep,
+        } => {
             let s = fs::read_to_string(&input)?;
             let mut doc: Document = serde_json::from_str(&s)?;
 
@@ -75,7 +104,11 @@ fn main() -> anyhow::Result<()> {
             println!("blockId\tkindCode\ttextHash\tpreview");
 
             for b in &doc.blocks {
-                if !kind_ranges.is_empty() && !kind_ranges.iter().any(|(lo, hi)| (lo..=hi).contains(&&b.kind_code)) {
+                if !kind_ranges.is_empty()
+                    && !kind_ranges
+                        .iter()
+                        .any(|(lo, hi)| (lo..=hi).contains(&&b.kind_code))
+                {
                     continue;
                 }
                 if let Some(ref want) = id {
@@ -92,7 +125,8 @@ fn main() -> anyhow::Result<()> {
                 let preview = make_preview(&b.text, INSPECT_PREVIEW_MAX_CHARS);
                 println!("{}\t{}\t{}\t{}", b.id, b.kind_code, b.text_hash, preview);
             }
-        },
+        }
+
         Command::EditPacket { input, tid, min } => {
             let s = fs::read_to_string(&input)?;
             let mut doc: Document = serde_json::from_str(&s)?;
@@ -106,74 +140,198 @@ fn main() -> anyhow::Result<()> {
             };
 
             println!("{out}");
-        },
+        }
+
         Command::ValidatePatch { edit_packet, patch } => {
             use std::process;
 
             let packet_s = match fs::read_to_string(&edit_packet) {
                 Ok(s) => s,
-                Err(e) => { eprintln!("{e}"); process::exit(1); }
+                Err(e) => {
+                    eprintln!("{e}");
+                    process::exit(1);
+                }
             };
-        
+
             let packet: editpacket::EditPacketV1 = match serde_json::from_str(&packet_s) {
                 Ok(p) => p,
-                Err(e) => { eprintln!("{e}"); process::exit(1); }
+                Err(e) => {
+                    eprintln!("{e}");
+                    process::exit(1);
+                }
             };
-        
+
             let patch_s = match fs::read_to_string(&patch) {
                 Ok(s) => s,
-                Err(e) => { eprintln!("{e}"); process::exit(1); }
+                Err(e) => {
+                    eprintln!("{e}");
+                    process::exit(1);
+                }
             };
-        
+
             let patch: patch::PatchV1 = match serde_json::from_str(&patch_s) {
                 Ok(p) => p,
-                Err(e) => { eprintln!("{e}"); process::exit(1); }
+                Err(e) => {
+                    eprintln!("{e}");
+                    process::exit(1);
+                }
             };
-        
+
             match patch::validate_patch_against_edit_packet(&packet, &patch) {
-                Ok(()) => { println!("OK"); process::exit(0); }
-                Err(msg) => { eprintln!("{msg}"); process::exit(2); }
+                Ok(()) => {
+                    println!("OK");
+                    process::exit(0);
+                }
+                Err(msg) => {
+                    eprintln!("{msg}");
+                    process::exit(2);
+                }
             }
-        },
-        Command::ApplyPatch { edit_packet, patch, min } => {
+        }
+
+        Command::ApplyPatch {
+            edit_packet,
+            patch_pos,
+            doc,
+            patch_flag,
+            out,
+            min,
+        } => {
             use std::process;
-                
-            let packet_s = match fs::read_to_string(&edit_packet) {
+
+            if let Some(doc_path) = doc {
+                // Document JSON pathway
+                if edit_packet.is_some() {
+                    eprintln!("cannot use <edit-packet> positional arg together with --doc");
+                    process::exit(1);
+                }
+
+                let patch_path = patch_flag.or(patch_pos).unwrap_or_else(|| {
+                    eprintln!("missing --patch <patch.json>");
+                    process::exit(1);
+                });
+
+                let doc_s = match fs::read_to_string(&doc_path) {
+                    Ok(s) => s,
+                    Err(e) => {
+                        eprintln!("{e}");
+                        process::exit(1);
+                    }
+                };
+
+                let mut doc: Document = match serde_json::from_str(&doc_s) {
+                    Ok(d) => d,
+                    Err(e) => {
+                        eprintln!("{e}");
+                        process::exit(1);
+                    }
+                };
+
+                // Ensure hashes are deterministic + consistent with the patch's expectations.
+                doc.recompute_hashes();
+
+                let patch_s = match fs::read_to_string(&patch_path) {
+                    Ok(s) => s,
+                    Err(e) => {
+                        eprintln!("{e}");
+                        process::exit(1);
+                    }
+                };
+
+                let patch: patch::PatchV1 = match serde_json::from_str(&patch_s) {
+                    Ok(p) => p,
+                    Err(e) => {
+                        eprintln!("{e}");
+                        process::exit(1);
+                    }
+                };
+
+                let updated = match patch::apply_patch_against_document(&doc, &patch) {
+                    Ok(d) => d,
+                    Err(msg) => {
+                        eprintln!("{msg}");
+                        process::exit(2);
+                    }
+                };
+
+                let out_json = if min {
+                    serde_json::to_string(&updated).unwrap()
+                } else {
+                    serde_json::to_string_pretty(&updated).unwrap()
+                };
+
+                if let Some(out_path) = out {
+                    if let Err(e) = fs::write(&out_path, out_json) {
+                        eprintln!("{e}");
+                        process::exit(1);
+                    }
+                    process::exit(0);
+                }
+
+                println!("{out_json}");
+                process::exit(0);
+            }
+
+            // Edit Packet pathway (backward compatible)
+            let edit_packet_path = edit_packet.unwrap_or_else(|| {
+                eprintln!("missing <edit-packet.json> positional arg (or use --doc)");
+                process::exit(1);
+            });
+
+            let patch_path = patch_pos.or(patch_flag).unwrap_or_else(|| {
+                eprintln!("missing <patch.json> positional arg (or use --patch)");
+                process::exit(1);
+            });
+
+            let packet_s = match fs::read_to_string(&edit_packet_path) {
                 Ok(s) => s,
-                Err(e) => { eprintln!("{e}"); process::exit(1); }
+                Err(e) => {
+                    eprintln!("{e}");
+                    process::exit(1);
+                }
             };
-        
-            // NOTE: deserialize using the canonical EditPacket type
+
             let packet: editpacket::EditPacketV1 = match serde_json::from_str(&packet_s) {
                 Ok(p) => p,
-                Err(e) => { eprintln!("{e}"); process::exit(1); }
+                Err(e) => {
+                    eprintln!("{e}");
+                    process::exit(1);
+                }
             };
-        
-            let patch_s = match fs::read_to_string(&patch) {
+
+            let patch_s = match fs::read_to_string(&patch_path) {
                 Ok(s) => s,
-                Err(e) => { eprintln!("{e}"); process::exit(1); }
+                Err(e) => {
+                    eprintln!("{e}");
+                    process::exit(1);
+                }
             };
-        
+
             let patch: patch::PatchV1 = match serde_json::from_str(&patch_s) {
                 Ok(p) => p,
-                Err(e) => { eprintln!("{e}"); process::exit(1); }
+                Err(e) => {
+                    eprintln!("{e}");
+                    process::exit(1);
+                }
             };
-        
+
             let updated = match patch::apply_patch_against_edit_packet(&packet, &patch) {
                 Ok(p) => p,
-                Err(msg) => { eprintln!("{msg}"); process::exit(2); }
+                Err(msg) => {
+                    eprintln!("{msg}");
+                    process::exit(2);
+                }
             };
-        
-            let out = if min {
+
+            let out_json = if min {
                 editpacket::to_minified_json(&updated).unwrap()
             } else {
                 editpacket::to_pretty_json(&updated).unwrap()
             };
-        
-            // keep newline behavior stable
-            println!("{out}");
+
+            println!("{out_json}");
             process::exit(0);
-        },            
+        }
     }
 
     Ok(())
@@ -209,13 +367,10 @@ fn make_preview(s: &str, max_chars: usize) -> String {
         count += 1;
     }
 
-    // If we stopped because we hit the bound, check if there is any remaining non-whitespace.
     if !truncated {
-        // We didn't hit the bound, so no ellipsis.
         return out;
     }
     if it.any(|c| !c.is_whitespace()) {
-        // Ensure ellipsis does not exceed max_chars by replacing last char when needed.
         if count >= max_chars {
             out.pop();
         }

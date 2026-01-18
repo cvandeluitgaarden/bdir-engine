@@ -49,6 +49,7 @@ pub mod patch {
     pub use bdir_patch::schema::{OpType, PatchOpV1, PatchV1};
     pub use bdir_patch::{
         apply_patch_against_edit_packet,
+        apply_patch_against_document,
         validate_patch,
         validate_patch_against_edit_packet,
     };
@@ -73,5 +74,5 @@ pub mod validate {
 /// Internal application helpers.
 #[doc(hidden)]
 pub mod apply {
-    pub use bdir_patch::apply_patch_against_edit_packet;
+    pub use bdir_patch::{apply_patch_against_edit_packet, apply_patch_against_document};
 }
