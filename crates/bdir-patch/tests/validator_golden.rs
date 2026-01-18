@@ -86,3 +86,18 @@ fn suggest_empty_message_fails_with_stable_message() {
     assert_eq!(err, "ops[0] (suggest) message is empty");
 }
 
+#[test]
+fn page_hash_mismatch_fails_with_stable_message() {
+    let doc = load_doc();
+    let patch = load_patch("patch.page_hash_mismatch.json");
+
+    let err = validate_patch(&doc, &patch).unwrap_err();
+    assert_eq!(
+        err,
+        format!(
+            "patch page hash mismatch (expected '__MISMATCH__', got '{}')",
+            doc.page_hash
+        )
+    );
+}
+

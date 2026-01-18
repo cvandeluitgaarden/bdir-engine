@@ -7,6 +7,7 @@
   "additionalProperties": false,
   "properties": {
     "v": { "type": "integer", "const": 1 },
+    "h": { "type": "string", "minLength": 1 },
     "ops": {
       "type": "array",
       "items": { "$ref": "#/definitions/op" }

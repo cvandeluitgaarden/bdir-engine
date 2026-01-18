@@ -15,6 +15,16 @@ pub fn validate_patch(doc: &Document, patch: &PatchV1) -> Result<(), String> {
         return Err(format!("unsupported patch version {}", patch.v));
     }
 
+    // Optional safety binding: ensure the patch is only applied to the intended page version.
+    if let Some(expected) = patch.h.as_deref() {
+        if doc.page_hash != expected {
+            return Err(format!(
+                "patch page hash mismatch (expected '{}', got '{}')",
+                expected, doc.page_hash
+            ));
+        }
+    }
+
     for (i, op) in patch.ops.iter().enumerate() {
         let block = doc
             .blocks
@@ -103,6 +113,16 @@ pub fn validate_patch_against_edit_packet(packet: &EditPacketV1, patch: &PatchV1
     }
     if packet.v != 1 {
         return Err(format!("unsupported edit packet version {}", packet.v));
+    }
+
+    // Optional safety binding: ensure the patch is only applied to the intended page version.
+    if let Some(expected) = patch.h.as_deref() {
+        if packet.h != expected {
+            return Err(format!(
+                "patch page hash mismatch (expected '{}', got '{}')",
+                expected, packet.h
+            ));
+        }
     }
 
     for (i, op) in patch.ops.iter().enumerate() {

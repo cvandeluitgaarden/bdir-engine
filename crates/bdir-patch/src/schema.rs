@@ -3,6 +3,12 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PatchV1 {
     pub v: u8,
+    /// Optional page-level hash binding.
+    ///
+    /// When present, validators MUST reject the patch if the target document/edit-packet
+    /// page hash does not exactly match this value.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub h: Option<String>,
     pub ops: Vec<PatchOpV1>,
 }
 

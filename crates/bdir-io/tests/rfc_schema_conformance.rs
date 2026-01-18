@@ -82,6 +82,7 @@ fn current_wire_types_conform_to_json_schemas() -> Result<()> {
     // Patch
     let patch = PatchV1 {
         v: bdir_io::version::PATCH_V,
+        h: None,
         ops: vec![PatchOpV1 {
             op: OpType::Suggest,
             block_id: "p1".to_string(),
