@@ -1,7 +1,14 @@
 mod util;
 
 use bdir_core::model::Document;
-use bdir_patch::{ValidateOptions, validate_patch, validate_patch_with_options, PatchV1};
+use bdir_patch::{
+    DiagnosticCode,
+    ValidateOptions,
+    validate_patch,
+    validate_patch_with_options,
+    validate_patch_with_diagnostics,
+    PatchV1,
+};
 
 fn load_doc() -> Document {
     let json = util::read_example_document_json();
@@ -66,6 +73,20 @@ fn before_too_short_fails_with_stable_message() {
         err,
         "ops[0] before is too short (<8 chars); likely ambiguous"
     );
+}
+
+#[test]
+fn diagnostics_surface_code_path_and_message() {
+    let doc = load_doc();
+    let patch = load_patch("patch.before_too_short.json");
+
+    let err = validate_patch_with_diagnostics(&doc, &patch, ValidateOptions::default())
+        .expect_err("expected validation to fail");
+    let diag = err.diagnostics.first().expect("at least one diagnostic");
+
+    assert_eq!(diag.code, DiagnosticCode::BeforeTooShort);
+    assert_eq!(diag.path.as_deref(), Some("ops[0].before"));
+    assert!(diag.message.contains("before is too short"));
 }
 
 #[test]

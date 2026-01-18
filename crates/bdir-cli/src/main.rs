@@ -76,6 +76,10 @@ enum Command {
         /// "teh" -> "the" at the expense of potential ambiguity.
         #[arg(long = "min-before-len")]
         min_before_len: Option<usize>,
+
+        /// Print machine-readable JSON diagnostics to stderr on validation failure.
+        #[arg(long = "diagnostics-json")]
+        diagnostics_json: bool,
     },
 
     /// Apply a Patch.
@@ -194,7 +198,12 @@ fn main() -> anyhow::Result<()> {
             println!("{out}");
         }
 
-        Command::ValidatePatch { edit_packet, patch, min_before_len } => {
+        Command::ValidatePatch {
+            edit_packet,
+            patch,
+            min_before_len,
+            diagnostics_json,
+        } => {
             use std::process;
 
             let packet_s = match fs::read_to_string(&edit_packet) {
@@ -252,13 +261,19 @@ fn main() -> anyhow::Result<()> {
                 None => patch::ValidateOptions::default(),
             };
 
-            match patch::validate_patch_against_edit_packet_with_options(&packet, &patch, opts) {
+            match patch::validate_patch_against_edit_packet_with_diagnostics(&packet, &patch, opts) {
                 Ok(()) => {
                     println!("OK");
                     process::exit(0);
                 }
-                Err(msg) => {
-                    eprintln!("{msg}");
+                Err(diag) => {
+                    if diagnostics_json {
+                        // Stable, structured diagnostics for machine handling.
+                        eprintln!("{}", serde_json::to_string(&diag).unwrap());
+                    } else {
+                        // Backward-compatible behavior.
+                        eprintln!("{}", diag.legacy_message());
+                    }
                     process::exit(2);
                 }
             }

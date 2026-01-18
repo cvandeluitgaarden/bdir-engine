@@ -1,6 +1,7 @@
 use bdir_core::model::Document;
 
 use crate::{
+    diagnostics::{DiagnosticCode, ValidationDiagnostic, ValidationError},
     schema::{DeleteOccurrence, OpType, PatchV1},
     EditPacketV1,
 };
@@ -41,16 +42,33 @@ pub fn validate_patch_with_options(
     patch: &PatchV1,
     opts: ValidateOptions,
 ) -> Result<(), String> {
+    validate_patch_with_diagnostics(doc, patch, opts).map_err(|e| e.legacy_message())
+}
+
+/// Validate a patch against a document and return structured diagnostics.
+pub fn validate_patch_with_diagnostics(
+    doc: &Document,
+    patch: &PatchV1,
+    opts: ValidateOptions,
+) -> Result<(), ValidationError> {
     if patch.v != 1 {
-        return Err(format!("unsupported patch version {}", patch.v));
+        return Err(err_root(
+            DiagnosticCode::UnsupportedPatchVersion,
+            "v",
+            format!("unsupported patch version {}", patch.v),
+        ));
     }
 
     // Optional safety binding: ensure the patch is only applied to the intended page version.
     if let Some(expected) = patch.h.as_deref() {
         if doc.page_hash != expected {
-            return Err(format!(
-                "patch page hash mismatch (expected '{}', got '{}')",
-                expected, doc.page_hash
+            return Err(err_root(
+                DiagnosticCode::PatchPageHashMismatch,
+                "h",
+                format!(
+                    "patch page hash mismatch (expected '{}', got '{}')",
+                    expected, doc.page_hash
+                ),
             ));
         }
     }
@@ -60,85 +78,176 @@ pub fn validate_patch_with_options(
             .blocks
             .iter()
             .find(|b| b.id == op.block_id)
-            .ok_or_else(|| format!("ops[{i}] references unknown block_id '{}'", op.block_id))?;
+            .ok_or_else(|| {
+                err_op(
+                    DiagnosticCode::UnknownBlockId,
+                    i,
+                    op.op,
+                    Some(op.block_id.clone()),
+                    Some(format!("ops[{i}].block_id")),
+                    format!("ops[{i}] references unknown block_id '{}'", op.block_id),
+                )
+            })?;
 
         match op.op {
             OpType::Replace => {
                 if op.occurrence.is_some() {
-                    return Err(format!(
-                        "ops[{i}] (replace) unexpected occurrence (only valid for delete)"
+                    return Err(err_op(
+                        DiagnosticCode::UnexpectedField,
+                        i,
+                        op.op,
+                        Some(op.block_id.clone()),
+                        Some(format!("ops[{i}].occurrence")),
+                        format!("ops[{i}] (replace) unexpected occurrence (only valid for delete)"),
                     ));
                 }
-                let before = op
-                    .before
-                    .as_deref()
-                    .ok_or_else(|| format!("ops[{i}] (replace) missing before"))?;
-                let _after = op
-                    .after
-                    .as_deref()
-                    .ok_or_else(|| format!("ops[{i}] (replace) missing after"))?;
+                let before = op.before.as_deref().ok_or_else(|| {
+                    err_op(
+                        DiagnosticCode::MissingField,
+                        i,
+                        op.op,
+                        Some(op.block_id.clone()),
+                        Some(format!("ops[{i}].before")),
+                        format!("ops[{i}] (replace) missing before"),
+                    )
+                })?;
+                let _after = op.after.as_deref().ok_or_else(|| {
+                    err_op(
+                        DiagnosticCode::MissingField,
+                        i,
+                        op.op,
+                        Some(op.block_id.clone()),
+                        Some(format!("ops[{i}].after")),
+                        format!("ops[{i}] (replace) missing after"),
+                    )
+                })?;
 
-                guard_before(i, before, opts.min_before_len)?;
+                guard_before_diag(i, op.op, &op.block_id, before, opts.min_before_len)?;
                 if !block.text.contains(before) {
-                    return Err(format!(
-                        "ops[{i}] (replace) before substring not found in block '{}'",
-                        op.block_id
+                    return Err(err_op(
+                        DiagnosticCode::BeforeNotFound,
+                        i,
+                        op.op,
+                        Some(op.block_id.clone()),
+                        Some(format!("ops[{i}].before")),
+                        format!(
+                            "ops[{i}] (replace) before substring not found in block '{}'",
+                            op.block_id
+                        ),
                     ));
                 }
             }
 
             OpType::Delete => {
-                let before = op
-                    .before
-                    .as_deref()
-                    .ok_or_else(|| format!("ops[{i}] (delete) missing before"))?;
+                let before = op.before.as_deref().ok_or_else(|| {
+                    err_op(
+                        DiagnosticCode::MissingField,
+                        i,
+                        op.op,
+                        Some(op.block_id.clone()),
+                        Some(format!("ops[{i}].before")),
+                        format!("ops[{i}] (delete) missing before"),
+                    )
+                })?;
 
-                let occ = op
-                    .occurrence
-                    .ok_or_else(|| format!("ops[{i}] (delete) missing occurrence"))?;
+                let occ = op.occurrence.ok_or_else(|| {
+                    err_op(
+                        DiagnosticCode::MissingField,
+                        i,
+                        op.op,
+                        Some(op.block_id.clone()),
+                        Some(format!("ops[{i}].occurrence")),
+                        format!("ops[{i}] (delete) missing occurrence"),
+                    )
+                })?;
 
-                // Exhaustive match to keep semantics explicit.
                 let _ = match occ {
                     DeleteOccurrence::First | DeleteOccurrence::All => occ,
                 };
 
-                guard_before(i, before, opts.min_before_len)?;
+                guard_before_diag(i, op.op, &op.block_id, before, opts.min_before_len)?;
                 if !block.text.contains(before) {
-                    return Err(format!(
-                        "ops[{i}] (delete) before substring not found in block '{}'",
-                        op.block_id
+                    return Err(err_op(
+                        DiagnosticCode::BeforeNotFound,
+                        i,
+                        op.op,
+                        Some(op.block_id.clone()),
+                        Some(format!("ops[{i}].before")),
+                        format!(
+                            "ops[{i}] (delete) before substring not found in block '{}'",
+                            op.block_id
+                        ),
                     ));
                 }
             }
 
             OpType::InsertAfter => {
                 if op.occurrence.is_some() {
-                    return Err(format!(
-                        "ops[{i}] (insert_after) unexpected occurrence (only valid for delete)"
+                    return Err(err_op(
+                        DiagnosticCode::UnexpectedField,
+                        i,
+                        op.op,
+                        Some(op.block_id.clone()),
+                        Some(format!("ops[{i}].occurrence")),
+                        format!(
+                            "ops[{i}] (insert_after) unexpected occurrence (only valid for delete)"
+                        ),
                     ));
                 }
-                let _content = op
-                    .content
-                    .as_deref()
-                    .ok_or_else(|| format!("ops[{i}] (insert_after) missing content"))?;
-                // No `before` required; insertion is anchored by block_id + position.
-                if _content.trim().is_empty() {
-                    return Err(format!("ops[{i}] (insert_after) content is empty"));
+                let content = op.content.as_deref().ok_or_else(|| {
+                    err_op(
+                        DiagnosticCode::MissingField,
+                        i,
+                        op.op,
+                        Some(op.block_id.clone()),
+                        Some(format!("ops[{i}].content")),
+                        format!("ops[{i}] (insert_after) missing content"),
+                    )
+                })?;
+                if content.trim().is_empty() {
+                    return Err(err_op(
+                        DiagnosticCode::ContentEmpty,
+                        i,
+                        op.op,
+                        Some(op.block_id.clone()),
+                        Some(format!("ops[{i}].content")),
+                        format!("ops[{i}] (insert_after) content is empty"),
+                    ));
                 }
             }
 
             OpType::Suggest => {
                 if op.occurrence.is_some() {
-                    return Err(format!(
-                        "ops[{i}] (suggest) unexpected occurrence (only valid for delete)"
+                    return Err(err_op(
+                        DiagnosticCode::UnexpectedField,
+                        i,
+                        op.op,
+                        Some(op.block_id.clone()),
+                        Some(format!("ops[{i}].occurrence")),
+                        format!(
+                            "ops[{i}] (suggest) unexpected occurrence (only valid for delete)"
+                        ),
                     ));
                 }
-                let msg = op
-                    .message
-                    .as_deref()
-                    .ok_or_else(|| format!("ops[{i}] (suggest) missing message"))?;
+                let msg = op.message.as_deref().ok_or_else(|| {
+                    err_op(
+                        DiagnosticCode::MissingField,
+                        i,
+                        op.op,
+                        Some(op.block_id.clone()),
+                        Some(format!("ops[{i}].message")),
+                        format!("ops[{i}] (suggest) missing message"),
+                    )
+                })?;
                 if msg.trim().is_empty() {
-                    return Err(format!("ops[{i}] (suggest) message is empty"));
+                    return Err(err_op(
+                        DiagnosticCode::MessageEmpty,
+                        i,
+                        op.op,
+                        Some(op.block_id.clone()),
+                        Some(format!("ops[{i}].message")),
+                        format!("ops[{i}] (suggest) message is empty"),
+                    ));
                 }
             }
         }
@@ -147,13 +256,33 @@ pub fn validate_patch_with_options(
     Ok(())
 }
 
-fn guard_before(i: usize, before: &str, min_before_len: usize) -> Result<(), String> {
+fn guard_before_diag(
+    i: usize,
+    op: OpType,
+    block_id: &str,
+    before: &str,
+    min_before_len: usize,
+) -> Result<(), ValidationError> {
     if before.trim().is_empty() {
-        return Err(format!("ops[{i}] before is empty/whitespace"));
+        return Err(err_op(
+            DiagnosticCode::BeforeEmpty,
+            i,
+            op,
+            Some(block_id.to_string()),
+            Some(format!("ops[{i}].before")),
+            format!("ops[{i}] before is empty/whitespace"),
+        ));
     }
     if before.chars().count() < min_before_len {
-        return Err(format!(
-            "ops[{i}] before is too short (<{min_before_len} chars); likely ambiguous"
+        return Err(err_op(
+            DiagnosticCode::BeforeTooShort,
+            i,
+            op,
+            Some(block_id.to_string()),
+            Some(format!("ops[{i}].before")),
+            format!(
+                "ops[{i}] before is too short (<{min_before_len} chars); likely ambiguous"
+            ),
         ));
     }
     Ok(())
@@ -169,29 +298,56 @@ pub fn validate_patch_against_edit_packet_with_options(
     patch: &PatchV1,
     opts: ValidateOptions,
 ) -> Result<(), String> {
+    validate_patch_against_edit_packet_with_diagnostics(packet, patch, opts)
+        .map_err(|e| e.legacy_message())
+}
+
+/// Validate a patch against an edit packet and return structured diagnostics.
+pub fn validate_patch_against_edit_packet_with_diagnostics(
+    packet: &EditPacketV1,
+    patch: &PatchV1,
+    opts: ValidateOptions,
+) -> Result<(), ValidationError> {
     if patch.v != 1 {
-        return Err(format!("unsupported patch version {}", patch.v));
+        return Err(err_root(
+            DiagnosticCode::UnsupportedPatchVersion,
+            "v",
+            format!("unsupported patch version {}", patch.v),
+        ));
     }
     if packet.v != 1 {
-        return Err(format!("unsupported edit packet version {}", packet.v));
+        return Err(err_root(
+            DiagnosticCode::UnsupportedEditPacketVersion,
+            "v",
+            format!("unsupported edit packet version {}", packet.v),
+        ));
     }
 
     // Optional safety binding: ensure the patch is only applied to the intended page version.
     if let Some(expected) = patch.h.as_deref() {
         if packet.h != expected {
-            return Err(format!(
-                "patch page hash mismatch (expected '{}', got '{}')",
-                expected, packet.h
+            return Err(err_root(
+                DiagnosticCode::PatchPageHashMismatch,
+                "h",
+                format!(
+                    "patch page hash mismatch (expected '{}', got '{}')",
+                    expected, packet.h
+                ),
             ));
         }
     }
 
     for (i, op) in patch.ops.iter().enumerate() {
-        let block = packet
-            .b
-            .iter()
-            .find(|t| t.0 == op.block_id)
-            .ok_or_else(|| format!("ops[{i}] references unknown block_id '{}'", op.block_id))?;
+        let block = packet.b.iter().find(|t| t.0 == op.block_id).ok_or_else(|| {
+            err_op(
+                DiagnosticCode::UnknownBlockId,
+                i,
+                op.op,
+                Some(op.block_id.clone()),
+                Some(format!("ops[{i}].block_id")),
+                format!("ops[{i}] references unknown block_id '{}'", op.block_id),
+            )
+        })?;
 
         // tuple layout: (id, kind, text_hash, text)
         let block_text = &block.3;
@@ -199,82 +355,195 @@ pub fn validate_patch_against_edit_packet_with_options(
         match op.op {
             OpType::Replace => {
                 if op.occurrence.is_some() {
-                    return Err(format!(
-                        "ops[{i}] (replace) unexpected occurrence (only valid for delete)"
+                    return Err(err_op(
+                        DiagnosticCode::UnexpectedField,
+                        i,
+                        op.op,
+                        Some(op.block_id.clone()),
+                        Some(format!("ops[{i}].occurrence")),
+                        format!("ops[{i}] (replace) unexpected occurrence (only valid for delete)"),
                     ));
                 }
-                let before = op
-                    .before
-                    .as_deref()
-                    .ok_or_else(|| format!("ops[{i}] (replace) missing before"))?;
-                let _after = op
-                    .after
-                    .as_deref()
-                    .ok_or_else(|| format!("ops[{i}] (replace) missing after"))?;
+                let before = op.before.as_deref().ok_or_else(|| {
+                    err_op(
+                        DiagnosticCode::MissingField,
+                        i,
+                        op.op,
+                        Some(op.block_id.clone()),
+                        Some(format!("ops[{i}].before")),
+                        format!("ops[{i}] (replace) missing before"),
+                    )
+                })?;
+                let _after = op.after.as_deref().ok_or_else(|| {
+                    err_op(
+                        DiagnosticCode::MissingField,
+                        i,
+                        op.op,
+                        Some(op.block_id.clone()),
+                        Some(format!("ops[{i}].after")),
+                        format!("ops[{i}] (replace) missing after"),
+                    )
+                })?;
 
-                guard_before(i, before, opts.min_before_len)?;
+                guard_before_diag(i, op.op, &op.block_id, before, opts.min_before_len)?;
                 if !block_text.contains(before) {
-                    return Err(format!(
-                        "ops[{i}] (replace) before substring not found in block '{}'",
-                        op.block_id
+                    return Err(err_op(
+                        DiagnosticCode::BeforeNotFound,
+                        i,
+                        op.op,
+                        Some(op.block_id.clone()),
+                        Some(format!("ops[{i}].before")),
+                        format!(
+                            "ops[{i}] (replace) before substring not found in block '{}'",
+                            op.block_id
+                        ),
                     ));
                 }
             }
 
             OpType::Delete => {
-                let before = op
-                    .before
-                    .as_deref()
-                    .ok_or_else(|| format!("ops[{i}] (delete) missing before"))?;
+                let before = op.before.as_deref().ok_or_else(|| {
+                    err_op(
+                        DiagnosticCode::MissingField,
+                        i,
+                        op.op,
+                        Some(op.block_id.clone()),
+                        Some(format!("ops[{i}].before")),
+                        format!("ops[{i}] (delete) missing before"),
+                    )
+                })?;
 
-                let occ = op
-                    .occurrence
-                    .ok_or_else(|| format!("ops[{i}] (delete) missing occurrence"))?;
+                let occ = op.occurrence.ok_or_else(|| {
+                    err_op(
+                        DiagnosticCode::MissingField,
+                        i,
+                        op.op,
+                        Some(op.block_id.clone()),
+                        Some(format!("ops[{i}].occurrence")),
+                        format!("ops[{i}] (delete) missing occurrence"),
+                    )
+                })?;
 
                 let _ = match occ {
                     DeleteOccurrence::First | DeleteOccurrence::All => occ,
                 };
 
-                guard_before(i, before, opts.min_before_len)?;
+                guard_before_diag(i, op.op, &op.block_id, before, opts.min_before_len)?;
                 if !block_text.contains(before) {
-                    return Err(format!(
-                        "ops[{i}] (delete) before substring not found in block '{}'",
-                        op.block_id
+                    return Err(err_op(
+                        DiagnosticCode::BeforeNotFound,
+                        i,
+                        op.op,
+                        Some(op.block_id.clone()),
+                        Some(format!("ops[{i}].before")),
+                        format!(
+                            "ops[{i}] (delete) before substring not found in block '{}'",
+                            op.block_id
+                        ),
                     ));
                 }
             }
 
             OpType::InsertAfter => {
                 if op.occurrence.is_some() {
-                    return Err(format!(
-                        "ops[{i}] (insert_after) unexpected occurrence (only valid for delete)"
+                    return Err(err_op(
+                        DiagnosticCode::UnexpectedField,
+                        i,
+                        op.op,
+                        Some(op.block_id.clone()),
+                        Some(format!("ops[{i}].occurrence")),
+                        format!(
+                            "ops[{i}] (insert_after) unexpected occurrence (only valid for delete)"
+                        ),
                     ));
                 }
-                let content = op
-                    .content
-                    .as_deref()
-                    .ok_or_else(|| format!("ops[{i}] (insert_after) missing content"))?;
+                let content = op.content.as_deref().ok_or_else(|| {
+                    err_op(
+                        DiagnosticCode::MissingField,
+                        i,
+                        op.op,
+                        Some(op.block_id.clone()),
+                        Some(format!("ops[{i}].content")),
+                        format!("ops[{i}] (insert_after) missing content"),
+                    )
+                })?;
                 if content.trim().is_empty() {
-                    return Err(format!("ops[{i}] (insert_after) content is empty"));
+                    return Err(err_op(
+                        DiagnosticCode::ContentEmpty,
+                        i,
+                        op.op,
+                        Some(op.block_id.clone()),
+                        Some(format!("ops[{i}].content")),
+                        format!("ops[{i}] (insert_after) content is empty"),
+                    ));
                 }
             }
 
             OpType::Suggest => {
                 if op.occurrence.is_some() {
-                    return Err(format!(
-                        "ops[{i}] (suggest) unexpected occurrence (only valid for delete)"
+                    return Err(err_op(
+                        DiagnosticCode::UnexpectedField,
+                        i,
+                        op.op,
+                        Some(op.block_id.clone()),
+                        Some(format!("ops[{i}].occurrence")),
+                        format!(
+                            "ops[{i}] (suggest) unexpected occurrence (only valid for delete)"
+                        ),
                     ));
                 }
-                let msg = op
-                    .message
-                    .as_deref()
-                    .ok_or_else(|| format!("ops[{i}] (suggest) missing message"))?;
+                let msg = op.message.as_deref().ok_or_else(|| {
+                    err_op(
+                        DiagnosticCode::MissingField,
+                        i,
+                        op.op,
+                        Some(op.block_id.clone()),
+                        Some(format!("ops[{i}].message")),
+                        format!("ops[{i}] (suggest) missing message"),
+                    )
+                })?;
                 if msg.trim().is_empty() {
-                    return Err(format!("ops[{i}] (suggest) message is empty"));
+                    return Err(err_op(
+                        DiagnosticCode::MessageEmpty,
+                        i,
+                        op.op,
+                        Some(op.block_id.clone()),
+                        Some(format!("ops[{i}].message")),
+                        format!("ops[{i}] (suggest) message is empty"),
+                    ));
                 }
             }
         }
     }
 
     Ok(())
+}
+
+fn err_root(code: DiagnosticCode, path: &str, message: String) -> ValidationError {
+    ValidationError::single(ValidationDiagnostic {
+        code,
+        path: Some(path.to_string()),
+        op_index: None,
+        op: None,
+        block_id: None,
+        message,
+    })
+}
+
+fn err_op(
+    code: DiagnosticCode,
+    op_index: usize,
+    op: OpType,
+    block_id: Option<String>,
+    path: Option<String>,
+    message: String,
+) -> ValidationError {
+    ValidationError::single(ValidationDiagnostic {
+        code,
+        path,
+        op_index: Some(op_index),
+        op: Some(op),
+        block_id,
+        message,
+    })
 }

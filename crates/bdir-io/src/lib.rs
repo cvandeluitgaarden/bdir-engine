@@ -47,14 +47,17 @@ pub mod editpacket {
 #[doc(hidden)]
 pub mod patch {
     pub use bdir_patch::schema::{OpType, PatchOpV1, PatchV1};
+    pub use bdir_patch::{DiagnosticCode, ValidationDiagnostic, ValidationError};
     pub use bdir_patch::{
         apply_patch_against_edit_packet,
         apply_patch_against_document,
         ValidateOptions,
         validate_patch,
         validate_patch_with_options,
+        validate_patch_with_diagnostics,
         validate_patch_against_edit_packet,
         validate_patch_against_edit_packet_with_options,
+        validate_patch_against_edit_packet_with_diagnostics,
     };
 }
 
@@ -65,6 +68,7 @@ pub mod prelude {
     pub use crate::core::{Block, BlockId, Document};
     pub use crate::editpacket::{BlockTupleV1, EditPacketV1};
     pub use crate::patch::{OpType, PatchOpV1, PatchV1};
+    pub use crate::patch::{DiagnosticCode, ValidationDiagnostic, ValidationError};
     pub use crate::{canonical_json, hashing};
 }
 
@@ -75,8 +79,13 @@ pub mod validate {
         ValidateOptions,
         validate_patch,
         validate_patch_with_options,
+        validate_patch_with_diagnostics,
         validate_patch_against_edit_packet,
         validate_patch_against_edit_packet_with_options,
+        validate_patch_against_edit_packet_with_diagnostics,
+        DiagnosticCode,
+        ValidationDiagnostic,
+        ValidationError,
     };
 }
 
