@@ -2,6 +2,7 @@ use clap::{Parser, Subcommand};
 use std::fs;
 
 use bdir_io::{core::Document, editpacket, patch};
+use bdir_io::document_json::parse_document_json_str;
 use jsonschema::Validator;
 use once_cell::sync::Lazy;
 use serde_json::Value;
@@ -157,7 +158,7 @@ fn main() -> anyhow::Result<()> {
             grep,
         } => {
             let s = fs::read_to_string(&input)?;
-            let mut doc: Document = serde_json::from_str(&s)?;
+            let mut doc: Document = parse_document_json_str(&s)?;
 
             // Keep output stable and useful for patch targeting/debugging.
             doc.recompute_hashes();
@@ -218,7 +219,7 @@ fn main() -> anyhow::Result<()> {
 
         Command::EditPacket { input, tid, min } => {
             let s = fs::read_to_string(&input)?;
-            let mut doc: Document = serde_json::from_str(&s)?;
+            let mut doc: Document = parse_document_json_str(&s)?;
             doc.recompute_hashes();
             let packet = editpacket::from_document(&doc, tid);
 
@@ -388,7 +389,7 @@ fn main() -> anyhow::Result<()> {
                     }
                 };
 
-                let mut doc: Document = match serde_json::from_str(&doc_s) {
+                let mut doc: Document = match parse_document_json_str(&doc_s) {
                     Ok(d) => d,
                     Err(e) => {
                         eprintln!("{e}");

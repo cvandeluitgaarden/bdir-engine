@@ -32,6 +32,9 @@ pub mod canonical_json;
 /// Hash helpers for canonical JSON and cache keys.
 pub mod hashing;
 
+/// Helpers for parsing Document JSON with improved diagnostics.
+pub mod document_json;
+
 /// Version constants for RFC conformance and CI gating.
 pub mod version;
 
@@ -78,6 +81,7 @@ pub mod prelude {
     pub use bdir_patch::PatchTelemetry;
     pub use crate::patch::{DiagnosticCode, ValidationDiagnostic, ValidationError};
     pub use crate::{canonical_json, hashing};
+    pub use crate::document_json::{parse_document_json_str, DocumentJsonError};
 }
 
 /// Internal validation helpers.
