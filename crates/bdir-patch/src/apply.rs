@@ -1,6 +1,6 @@
 use crate::schema::{OpType, PatchV1};
 use crate::validate::validate_patch_against_edit_packet;
-use bdir_core::hash::{canonicalize_text, sha256_hex, xxh64_hex};
+use bdir_core::hash::{hash_canon_hex, hash_hex};
 use bdir_editpacket::{BlockTupleV1, EditPacketV1};
 
 /// Apply a patch against an Edit Packet and return an updated Edit Packet.
@@ -21,9 +21,9 @@ pub fn apply_patch_against_edit_packet(
     // Validate first (stable error messages come from validator).
     validate_patch_against_edit_packet(packet, patch)?;
 
-    // Support protocol-level hash algorithms.
+    // Support any algorithm implemented by bdir-core.
     let algo = packet.ha.as_str();
-    if algo != "xxh64" && algo != "sha256" {
+    if hash_hex(algo, "").is_none() {
         return Err(format!("unsupported hash algorithm '{algo}'"));
     }
 
@@ -142,15 +142,12 @@ fn make_insert_id(blocks: &[BlockTupleV1], anchor_id: &str) -> String {
 /// Packet hash input is identical to the Document hash payload you used earlier:
 /// `{blockId}\t{kindCode}\t{textHash}\n` for each block in order.
 fn recompute_edit_packet_hashes(packet: &mut EditPacketV1, algo: &str) {
+    // Preserve the declared algorithm (and ensure hashes align with it).
     packet.ha = algo.to_string();
 
     // Recompute each block's textHash from canonicalized text.
     for t in &mut packet.b {
-        let canon = canonicalize_text(&t.3);
-        t.2 = match algo {
-            "sha256" => sha256_hex(&canon),
-            _ => xxh64_hex(&canon),
-        };
+        t.2 = hash_canon_hex(algo, &t.3).expect("supported algorithm");
     }
 
     // Recompute packet hash from ordered tuples.
@@ -164,8 +161,5 @@ fn recompute_edit_packet_hashes(packet: &mut EditPacketV1, algo: &str) {
         payload.push('\n');
     }
 
-    packet.h = match algo {
-        "sha256" => sha256_hex(&payload),
-        _ => xxh64_hex(&payload),
-    };
+    packet.h = hash_hex(algo, &payload).expect("supported algorithm");
 }

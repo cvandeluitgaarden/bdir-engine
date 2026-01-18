@@ -52,6 +52,44 @@ The CLI is intended to support basic workflows:
 - Validate a patch against an edit packet / document
 - Apply a validated patch
 
+Currently implemented commands:
+
+### Inspect
+
+Inspect a Document JSON and print a deterministic, tab-separated table of blocks:
+
+```bash
+bdir inspect <document.json>
+```
+
+Output columns:
+
+* `blockId`
+* `kindCode`
+* `textHash`
+* `preview` (bounded, whitespace-collapsed)
+
+Filters:
+
+```bash
+# Filter by kindCode (repeatable; supports ranges)
+bdir inspect document.json --kind 0 --kind 2-10
+
+# Filter by exact block id
+bdir inspect document.json --id p1
+
+# Filter by substring match on text
+bdir inspect document.json --grep typo
+```
+
+### Other commands
+
+```bash
+bdir edit-packet <document.json> [--min] [--tid <trace-id>]
+bdir validate-patch <edit-packet.json> <patch.json>
+bdir apply-patch <edit-packet.json> <patch.json> [--min]
+```
+
 Example (illustrative):
 
 ```bash

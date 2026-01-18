@@ -1,5 +1,5 @@
-use sha2::{Digest, Sha256};
 use xxhash_rust::xxh3::xxh3_64;
+use sha2::{Digest, Sha256};
 
 /// Canonicalize text for hashing.
 ///
@@ -55,11 +55,30 @@ pub fn sha256_hex(input: &str) -> String {
     let mut hasher = Sha256::new();
     hasher.update(input.as_bytes());
     let digest = hasher.finalize();
-    hex::encode(digest)
+    format!("{:x}", digest)
 }
 
-/// Convenience: sha256 hash over canonicalized text.
+/// Convenience: sha256 over canonicalized text.
 pub fn sha256_canon_hex(input: &str) -> String {
     let canon = canonicalize_text(input);
     sha256_hex(&canon)
+}
+
+/// Hash helper that respects a declared algorithm name.
+///
+/// Supported algorithms:
+/// - "xxh64" (implemented via xxh3_64)
+/// - "sha256"
+pub fn hash_hex(algo: &str, input: &str) -> Option<String> {
+    match algo {
+        "xxh64" => Some(xxh64_hex(input)),
+        "sha256" => Some(sha256_hex(input)),
+        _ => None,
+    }
+}
+
+/// Hash canonicalized text using the declared algorithm.
+pub fn hash_canon_hex(algo: &str, input: &str) -> Option<String> {
+    let canon = canonicalize_text(input);
+    hash_hex(algo, &canon)
 }

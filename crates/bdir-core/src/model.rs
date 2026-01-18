@@ -1,5 +1,5 @@
 use serde::{Deserialize, Serialize};
-use crate::hash::{canonicalize_text, sha256_hex, xxh64_hex};
+use crate::hash::{hash_canon_hex, hash_hex};
 
 /// A stable identifier for a block.
 pub type BlockId = String;
@@ -32,21 +32,16 @@ impl Document {
     /// Page hash is computed over ordered lines:
     /// `{blockId}\t{kindCode}\t{textHash}\n`
     pub fn recompute_hashes(&mut self) {
-        // Respect the selected algorithm. Default to xxh64 if missing/unknown.
-        let algo = match self.hash_algorithm.as_str() {
-            "xxh64" | "sha256" => self.hash_algorithm.as_str(),
-            _ => {
-                self.hash_algorithm = "xxh64".to_string();
-                "xxh64"
-            }
-        };
+        // Respect the document's declared algorithm. Default to xxh64 if empty/unknown.
+        // NOTE: We must avoid holding a `&str` borrow into `self.hash_algorithm` across assignment.
+        let mut algo = self.hash_algorithm.trim().to_lowercase();
+        if algo.is_empty() || hash_hex(&algo, "").is_none() {
+            algo = "xxh64".to_string();
+        }
+        self.hash_algorithm = algo.clone();
 
         for b in &mut self.blocks {
-            let canon = canonicalize_text(&b.text);
-            b.text_hash = match algo {
-                "sha256" => sha256_hex(&canon),
-                _ => xxh64_hex(&canon),
-            };
+            b.text_hash = hash_canon_hex(&algo, &b.text).expect("supported algorithm");
         }
 
         let mut page_payload = String::new();
@@ -59,9 +54,6 @@ impl Document {
             page_payload.push('\n');
         }
 
-        self.page_hash = match algo {
-            "sha256" => sha256_hex(&page_payload),
-            _ => xxh64_hex(&page_payload),
-        };
+        self.page_hash = hash_hex(&algo, &page_payload).expect("supported algorithm");
     }
 }

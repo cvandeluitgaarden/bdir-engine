@@ -21,7 +21,7 @@
 #[doc(hidden)]
 pub mod core {
     pub use bdir_core::model::{Block, BlockId, Document};
-    pub use bdir_core::hash::{canonicalize_text, sha256_hex, xxh64_hex};
+    pub use bdir_core::hash::{canonicalize_text, xxh64_hex};
 }
 
 /// Deterministic JSON canonicalization helpers.
