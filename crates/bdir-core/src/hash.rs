@@ -1,3 +1,4 @@
+use sha2::{Digest, Sha256};
 use xxhash_rust::xxh3::xxh3_64;
 
 /// Canonicalize text for hashing.
@@ -45,4 +46,20 @@ pub fn xxh64_hex(input: &str) -> String {
 pub fn xxh64_canon_hex(input: &str) -> String {
     let canon = canonicalize_text(input);
     xxh64_hex(&canon)
+}
+
+/// Compute a sha256 hash (hex) over UTF-8 bytes.
+///
+/// Returned as fixed-width 64-char lowercase hex.
+pub fn sha256_hex(input: &str) -> String {
+    let mut hasher = Sha256::new();
+    hasher.update(input.as_bytes());
+    let digest = hasher.finalize();
+    hex::encode(digest)
+}
+
+/// Convenience: sha256 hash over canonicalized text.
+pub fn sha256_canon_hex(input: &str) -> String {
+    let canon = canonicalize_text(input);
+    sha256_hex(&canon)
 }

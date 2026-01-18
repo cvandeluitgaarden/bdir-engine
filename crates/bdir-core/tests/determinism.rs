@@ -1,7 +1,6 @@
-
-mod util_fs;
-
+mod common;
 use bdir_core::model::Document;
+use common::util_fs;
 
 #[test]
 fn recompute_hashes_is_deterministic() {

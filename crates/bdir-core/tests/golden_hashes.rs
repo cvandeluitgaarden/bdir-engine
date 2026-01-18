@@ -1,6 +1,6 @@
-mod util_fs;
-mod util_hash;
+mod common;
 use bdir_core::model::Document;
+use common::{util_fs, util_hash}; 
 
 #[test]
 fn golden_hashes_example_document_v1() {
