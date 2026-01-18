@@ -13,6 +13,8 @@ serde_json = "1"
 bdir-io = { path = "../bdir-io" }
 anyhow = "1"
 assert_cmd = "2.1.2"
+tabwriter = "1.4.1"
+bdir-codebook = { path = "../bdir-codebook" }
 
 [dev-dependencies]
 assert_cmd = "2.1.2"

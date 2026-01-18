@@ -1,0 +1,9 @@
+[package]
+name = "bdir-codebook"
+version = "0.1.0"
+edition = "2024"
+description = "BDIR kindCode importance helpers"
+license = "Apache-2.0"
+
+[lib]
+path = "src/lib.rs"

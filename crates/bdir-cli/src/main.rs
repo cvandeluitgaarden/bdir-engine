@@ -2,6 +2,7 @@ use clap::{Parser, Subcommand};
 use std::fs;
 
 use bdir_io::{core::Document, editpacket, patch};
+use std::io::{self, IsTerminal, Write};
 
 const INSPECT_PREVIEW_MAX_CHARS: usize = 80;
 
@@ -100,30 +101,55 @@ fn main() -> anyhow::Result<()> {
 
             let kind_ranges = parse_kind_filters(&kind_filters)?;
 
-            // Header is stable and makes output self-describing.
-            println!("blockId\tkindCode\ttextHash\tpreview");
+            // TSV when non-interactive (tests/pipes), aligned table when interactive (terminal).
+            let stdout = io::stdout();
+            let is_tty = stdout.is_terminal();
 
-            for b in &doc.blocks {
-                if !kind_ranges.is_empty()
-                    && !kind_ranges
-                        .iter()
-                        .any(|(lo, hi)| (lo..=hi).contains(&&b.kind_code))
-                {
-                    continue;
-                }
-                if let Some(ref want) = id {
-                    if &b.id != want {
+            let emit = |out: &mut dyn Write| -> anyhow::Result<()> {
+                writeln!(out, "blockId\tkindCode\timportance\ttextHash\tpreview")?;
+            
+                for b in &doc.blocks {
+                    if !kind_ranges.is_empty()
+                        && !kind_ranges
+                            .iter()
+                            .any(|(lo, hi)| (lo..=hi).contains(&&b.kind_code))
+                    {
                         continue;
                     }
-                }
-                if let Some(ref needle) = grep {
-                    if !b.text.contains(needle) {
-                        continue;
+                    if let Some(ref want) = id {
+                        if &b.id != want {
+                            continue;
+                        }
                     }
-                }
+                    if let Some(ref needle) = grep {
+                        if !b.text.contains(needle) {
+                            continue;
+                        }
+                    }
 
-                let preview = make_preview(&b.text, INSPECT_PREVIEW_MAX_CHARS);
-                println!("{}\t{}\t{}\t{}", b.id, b.kind_code, b.text_hash, preview);
+                    let preview = make_preview(&b.text, INSPECT_PREVIEW_MAX_CHARS);
+                
+                    writeln!(
+                        out,
+                        "{}\t{}\t{}\t{}\t{}",
+                        b.id,
+                        b.kind_code,
+                        bdir_codebook::importance(b.kind_code),
+                        b.text_hash,
+                        preview
+                    )?;
+                }
+            
+                Ok(())
+            };
+
+            if is_tty {
+                let mut out = tabwriter::TabWriter::new(stdout.lock());
+                emit(&mut out)?;
+                out.flush()?;
+            } else {
+                let mut out = stdout.lock();
+                emit(&mut out)?;
             }
         }
 

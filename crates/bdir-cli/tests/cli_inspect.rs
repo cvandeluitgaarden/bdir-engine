@@ -16,10 +16,10 @@ fn cli_inspect_stdout_golden() {
     cmd.args(["inspect", input.to_str().unwrap()]);
 
     cmd.assert().success().stdout(
-        "blockId\tkindCode\ttextHash\tpreview\n\
-t1\t0\t2d85646dba5758f4\tExample Page Title\n\
-p1\t2\ta3c9cb84972dd67e\tThis is an example paragraph with a typo teh.\n\
-b1\t20\t7a6ea7f684209672\tHome > Section > Page\n",
+        "blockId\tkindCode\timportance\ttextHash\tpreview\n\
+t1\t0\tcore\t2d85646dba5758f4\tExample Page Title\n\
+p1\t2\tcore\ta3c9cb84972dd67e\tThis is an example paragraph with a typo teh.\n\
+b1\t20\tboilerplate\t7a6ea7f684209672\tHome > Section > Page\n",
     );
 }
 
@@ -31,33 +31,33 @@ fn cli_inspect_filters_work() {
     let mut cmd = cargo_bin_cmd!("bdir");
     cmd.args(["inspect", input.to_str().unwrap(), "--kind", "0"]);
     cmd.assert().success().stdout(
-        "blockId\tkindCode\ttextHash\tpreview\n\
-t1\t0\t2d85646dba5758f4\tExample Page Title\n",
+        "blockId\tkindCode\timportance\ttextHash\tpreview\n\
+t1\t0\tcore\t2d85646dba5758f4\tExample Page Title\n",
     );
 
     // --kind range
     let mut cmd = cargo_bin_cmd!("bdir");
     cmd.args(["inspect", input.to_str().unwrap(), "--kind", "0-2"]);
     cmd.assert().success().stdout(
-        "blockId\tkindCode\ttextHash\tpreview\n\
-t1\t0\t2d85646dba5758f4\tExample Page Title\n\
-p1\t2\ta3c9cb84972dd67e\tThis is an example paragraph with a typo teh.\n",
+        "blockId\tkindCode\timportance\ttextHash\tpreview\n\
+t1\t0\tcore\t2d85646dba5758f4\tExample Page Title\n\
+p1\t2\tcore\ta3c9cb84972dd67e\tThis is an example paragraph with a typo teh.\n",
     );
 
     // --id exact
     let mut cmd = cargo_bin_cmd!("bdir");
     cmd.args(["inspect", input.to_str().unwrap(), "--id", "b1"]);
     cmd.assert().success().stdout(
-        "blockId\tkindCode\ttextHash\tpreview\n\
-b1\t20\t7a6ea7f684209672\tHome > Section > Page\n",
+        "blockId\tkindCode\timportance\ttextHash\tpreview\n\
+b1\t20\tboilerplate\t7a6ea7f684209672\tHome > Section > Page\n",
     );
 
     // --grep substring
     let mut cmd = cargo_bin_cmd!("bdir");
     cmd.args(["inspect", input.to_str().unwrap(), "--grep", "typo"]);
     cmd.assert().success().stdout(
-        "blockId\tkindCode\ttextHash\tpreview\n\
-p1\t2\ta3c9cb84972dd67e\tThis is an example paragraph with a typo teh.\n",
+        "blockId\tkindCode\timportance\ttextHash\tpreview\n\
+p1\t2\tcore\ta3c9cb84972dd67e\tThis is an example paragraph with a typo teh.\n",
     );
 }
 
@@ -89,8 +89,8 @@ fn cli_inspect_preview_is_bounded() {
     let _header = lines.next().unwrap();
     let row = lines.next().unwrap();
     let cols: Vec<&str> = row.split('\t').collect();
-    assert_eq!(cols.len(), 4);
-    let preview = cols[3];
+    assert_eq!(cols.len(), 5);
+    let preview = cols[4];
 
     // 80-char bound, with ellipsis when truncated.
     assert!(preview.chars().count() <= 80);
