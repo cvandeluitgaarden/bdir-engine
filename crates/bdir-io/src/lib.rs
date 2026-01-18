@@ -61,6 +61,10 @@ pub mod patch {
         validate_patch_against_edit_packet,
         validate_patch_against_edit_packet_with_options,
         validate_patch_against_edit_packet_with_diagnostics,
+        validate_patch_with_telemetry,
+        validate_patch_against_edit_packet_with_telemetry,
+        apply_patch_against_edit_packet_with_telemetry,
+        apply_patch_against_document_with_telemetry,
     };
 }
 
@@ -71,6 +75,7 @@ pub mod prelude {
     pub use crate::core::{Block, BlockId, Document};
     pub use crate::editpacket::{BlockTupleV1, EditPacketV1};
     pub use crate::patch::{OpType, PatchOpV1, PatchV1};
+    pub use bdir_patch::PatchTelemetry;
     pub use crate::patch::{DiagnosticCode, ValidationDiagnostic, ValidationError};
     pub use crate::{canonical_json, hashing};
 }

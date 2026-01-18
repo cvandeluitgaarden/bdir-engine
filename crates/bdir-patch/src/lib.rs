@@ -11,6 +11,7 @@ pub mod apply;
 pub mod diagnostics;
 pub mod schema;
 pub mod validate;
+pub mod telemetry;
 
 pub use bdir_editpacket::schema::{EditPacketV1, BlockTupleV1};
 pub use apply::{
@@ -18,8 +19,11 @@ pub use apply::{
     apply_patch_against_edit_packet_with_options,
     apply_patch_against_document,
     apply_patch_against_document_with_options,
+    apply_patch_against_edit_packet_with_telemetry,
+    apply_patch_against_document_with_telemetry,
 };
 pub use diagnostics::{DiagnosticCode, ValidationDiagnostic, ValidationError};
+pub use telemetry::PatchTelemetry;
 pub use schema::{OpType, PatchOpV1, PatchV1};
 pub use validate::{
     KindCodePolicy,
@@ -30,4 +34,6 @@ pub use validate::{
     validate_patch_against_edit_packet_with_options,
     validate_patch_with_diagnostics,
     validate_patch_against_edit_packet_with_diagnostics,
+    validate_patch_with_telemetry,
+    validate_patch_against_edit_packet_with_telemetry,
 };

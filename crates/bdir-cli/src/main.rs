@@ -92,6 +92,12 @@ enum Command {
         #[arg(long = "kindcode-allow")]
         kindcode_allow: Vec<String>,
 
+        
+
+
+        /// Emit PatchTelemetry JSON to stderr (deterministic, machine-readable).
+        #[arg(long = "telemetry-json")]
+        telemetry_json: bool,
         /// Print machine-readable JSON diagnostics to stderr on validation failure.
         #[arg(long = "diagnostics-json")]
         diagnostics_json: bool,
@@ -133,6 +139,10 @@ enum Command {
         /// Allowed kindCode filter/ranges (repeatable) used only when --strict-kindcode is set.
         #[arg(long = "kindcode-allow")]
         kindcode_allow: Vec<String>,
+
+        /// Emit PatchTelemetry JSON to stderr (deterministic, machine-readable).
+        #[arg(long = "telemetry-json")]
+        telemetry_json: bool,
     },
 }
 
@@ -228,6 +238,7 @@ fn main() -> anyhow::Result<()> {
             strict_kindcode,
             kindcode_allow,
             diagnostics_json,
+            telemetry_json,
         } => {
             use std::process;
 
@@ -299,17 +310,29 @@ fn main() -> anyhow::Result<()> {
                 }
             }
 
-            match patch::validate_patch_against_edit_packet_with_diagnostics(&packet, &patch, opts) {
+            let (res, tel) = patch::validate_patch_against_edit_packet_with_telemetry(&packet, &patch, opts);
+
+            match res {
                 Ok(()) => {
+                    if telemetry_json {
+                        // Deterministic telemetry for monitoring / CI.
+                        eprintln!("{}", serde_json::to_string(&tel).unwrap());
+                    }
                     println!("OK");
                     process::exit(0);
                 }
                 Err(diag) => {
-                    if diagnostics_json {
-                        // Stable, structured diagnostics for machine handling.
+                    if diagnostics_json && telemetry_json {
+                        // Combined machine-readable report.
+                        let report = serde_json::json!({"telemetry": tel, "diagnostics": diag});
+                        eprintln!("{}", serde_json::to_string(&report).unwrap());
+                    } else if diagnostics_json {
                         eprintln!("{}", serde_json::to_string(&diag).unwrap());
+                    } else if telemetry_json {
+                        // Keep stderr parseable: emit a single JSON object.
+                        let report = serde_json::json!({"telemetry": tel, "error": diag.legacy_message()});
+                        eprintln!("{}", serde_json::to_string(&report).unwrap());
                     } else {
-                        // Backward-compatible behavior.
                         eprintln!("{}", diag.legacy_message());
                     }
                     process::exit(2);
@@ -326,6 +349,7 @@ fn main() -> anyhow::Result<()> {
             min,
             strict_kindcode,
             kindcode_allow,
+            telemetry_json,
         } => {
             use std::process;
 
@@ -400,10 +424,22 @@ fn main() -> anyhow::Result<()> {
                     }
                 };
 
-                let updated = match patch::apply_patch_against_document_with_options(&doc, &patch, opts.clone()) {
-                    Ok(d) => d,
+                let (res, tel) = patch::apply_patch_against_document_with_telemetry(&doc, &patch, opts.clone());
+
+                let updated = match res {
+                    Ok(d) => {
+                        if telemetry_json {
+                            eprintln!("{}", serde_json::to_string(&tel).unwrap());
+                        }
+                        d
+                    }
                     Err(msg) => {
-                        eprintln!("{msg}");
+                        if telemetry_json {
+                            let report = serde_json::json!({"telemetry": tel, "error": msg});
+                            eprintln!("{}", serde_json::to_string(&report).unwrap());
+                        } else {
+                            eprintln!("{msg}");
+                        }
                         process::exit(2);
                     }
                 };
@@ -487,10 +523,22 @@ fn main() -> anyhow::Result<()> {
                 }
             };
 
-            let updated = match patch::apply_patch_against_edit_packet_with_options(&packet, &patch, opts) {
-                Ok(p) => p,
+            let (res, tel) = patch::apply_patch_against_edit_packet_with_telemetry(&packet, &patch, opts);
+
+            let updated = match res {
+                Ok(p) => {
+                    if telemetry_json {
+                        eprintln!("{}", serde_json::to_string(&tel).unwrap());
+                    }
+                    p
+                }
                 Err(msg) => {
-                    eprintln!("{msg}");
+                    if telemetry_json {
+                        let report = serde_json::json!({"telemetry": tel, "error": msg});
+                        eprintln!("{}", serde_json::to_string(&report).unwrap());
+                    } else {
+                        eprintln!("{msg}");
+                    }
                     process::exit(2);
                 }
             };

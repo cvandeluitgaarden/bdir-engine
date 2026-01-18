@@ -1,9 +1,7 @@
 use bdir_core::model::Document;
 
 use crate::{
-    diagnostics::{DiagnosticCode, ValidationDiagnostic, ValidationError},
-    schema::{DeleteOccurrence, OpType, PatchV1},
-    EditPacketV1,
+    EditPacketV1, PatchTelemetry, diagnostics::{DiagnosticCode, ValidationDiagnostic, ValidationError}, schema::{DeleteOccurrence, OpType, PatchV1}
 };
 
 /// kindCode enforcement policy.
@@ -651,4 +649,105 @@ fn err_op(
         block_id,
         message,
     })
+}
+// -----------------------------------------------------------------------------
+// Telemetry wrappers (deterministic)
+// -----------------------------------------------------------------------------
+
+/// Validate a patch against an Edit Packet and return deterministic telemetry.
+///
+/// Returns a tuple of (result, telemetry) so callers can emit telemetry even on failure.
+pub fn validate_patch_against_edit_packet_with_telemetry(
+    packet: &EditPacketV1,
+    patch: &PatchV1,
+    opts: ValidateOptions,
+) -> (Result<(), ValidationError>, PatchTelemetry) {
+    use std::time::Instant;
+
+    let start = Instant::now();
+    let (patch_ops, patch_ops_by_type, target_blocks) = PatchTelemetry::op_counts(&patch.ops);
+
+    let input_chars = Some(packet.b.iter().map(|t| t.3.len()).sum::<usize>());
+
+    let res = validate_patch_against_edit_packet_with_diagnostics(packet, patch, opts.clone());
+    let elapsed_ms = start.elapsed().as_millis() as u64;
+
+    let tel = PatchTelemetry {
+        op: "validate".to_string(),
+        ok: res.is_ok(),
+        elapsed_ms,
+        patch_v: patch.v as u16,
+        edit_packet_v: Some(packet.v as u16),
+        hash_algorithm: Some(packet.ha.clone()),
+        patch_ops,
+        patch_ops_by_type,
+        target_blocks,
+        strict_kind_code: opts.strict_kind_code,
+        min_before_len: opts.min_before_len,
+        kind_code_allow: if opts.strict_kind_code {
+            PatchTelemetry::kind_allow_strings(&opts.kind_code_policy.allow_ranges)
+        } else {
+            vec![]
+        },
+        input_chars,
+        output_chars: None,
+        error_code: res
+            .as_ref()
+            .err()
+            .and_then(|e| e.diagnostics.first())
+            .map(|d| format!("{:?}", d.code).to_lowercase()),
+    };
+
+    // Keep ordering stable (BTreeMap) and avoid unused mut lint in older rust versions.
+    if tel.kind_code_allow.is_empty() {
+        // no-op
+    }
+
+    (res.map(|_| ()), tel)
+}
+
+/// Validate a patch against a Document and return deterministic telemetry.
+///
+/// Returns a tuple of (result, telemetry) so callers can emit telemetry even on failure.
+pub fn validate_patch_with_telemetry(
+    doc: &Document,
+    patch: &PatchV1,
+    opts: ValidateOptions,
+) -> (Result<(), ValidationError>, PatchTelemetry) {
+    use std::time::Instant;
+
+    let start = Instant::now();
+    let (patch_ops, patch_ops_by_type, target_blocks) = PatchTelemetry::op_counts(&patch.ops);
+    let input_chars = Some(doc.blocks.iter().map(|b| b.text.len()).sum::<usize>());
+
+    let res = validate_patch_with_diagnostics(doc, patch, opts.clone());
+    let elapsed_ms = start.elapsed().as_millis() as u64;
+
+    let tel = PatchTelemetry {
+        op: "validate".to_string(),
+        ok: res.is_ok(),
+        elapsed_ms,
+        patch_v: patch.v as u16,
+        edit_packet_v: None,
+        hash_algorithm: Some(doc.hash_algorithm.clone()),
+        patch_ops,
+        patch_ops_by_type,
+        target_blocks,
+        strict_kind_code: opts.strict_kind_code,
+        min_before_len: opts.min_before_len,
+        kind_code_allow: if opts.strict_kind_code {
+            PatchTelemetry::kind_allow_strings(&opts.kind_code_policy.allow_ranges)
+        } else {
+            vec![]
+        },
+        input_chars,
+        output_chars: None,
+        error_code: res
+            .as_ref()
+            .err()
+            .and_then(|e| e.diagnostics.first())
+            .map(|d| format!("{:?}", d.code).to_lowercase()),
+    };
+
+    (res.map(|_| ()), tel)
 }
