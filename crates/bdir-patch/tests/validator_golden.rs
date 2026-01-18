@@ -48,6 +48,15 @@ fn before_not_found_fails_with_stable_message() {
 }
 
 #[test]
+fn delete_missing_occurrence_fails_with_stable_message() {
+    let doc = load_doc();
+    let patch = load_patch("patch.delete_missing_occurrence.json");
+
+    let err = validate_patch(&doc, &patch).unwrap_err();
+    assert_eq!(err, "ops[0] (delete) missing occurrence");
+}
+
+#[test]
 fn before_too_short_fails_with_stable_message() {
     let doc = load_doc();
     let patch = load_patch("patch.before_too_short.json");

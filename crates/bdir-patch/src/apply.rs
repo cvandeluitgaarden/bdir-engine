@@ -1,4 +1,4 @@
-use crate::schema::{OpType, PatchV1};
+use crate::schema::{DeleteOccurrence, OpType, PatchV1};
 use crate::validate::{validate_patch, validate_patch_against_edit_packet};
 use bdir_core::hash::{hash_canon_hex, hash_hex};
 use bdir_core::model::{Block, Document};
@@ -8,7 +8,7 @@ use bdir_editpacket::{BlockTupleV1, EditPacketV1};
 ///
 /// Deterministic semantics:
 /// - replace: replace the FIRST occurrence of `before` with `after` within the block text
-/// - delete: remove ALL occurrences of `before` within the block text (substring delete)
+/// - delete: remove FIRST or ALL occurrences of `before` within the block text (explicit via `occurrence`)
 /// - insert_after: inserts a new block AFTER the referenced block_id, with `text = after`
 /// - suggest: no mutation (informational only)
 ///
@@ -56,11 +56,18 @@ pub fn apply_patch_against_edit_packet(
                     .as_deref()
                     .ok_or_else(|| "ops delete missing before (should be validated)".to_string())?;
 
+                let occ = op
+                    .occurrence
+                    .ok_or_else(|| "ops delete missing occurrence (should be validated)".to_string())?;
+
                 let idx = find_block_index(&out.b, &op.block_id)
                     .ok_or_else(|| format!("unknown block_id '{}'", op.block_id))?;
 
                 let current_text = out.b[idx].3.clone();
-                out.b[idx].3 = current_text.replace(before, "");
+                out.b[idx].3 = match occ {
+                    DeleteOccurrence::First => delete_first(&current_text, before),
+                    DeleteOccurrence::All => current_text.replace(before, ""),
+                };
             }
 
             OpType::InsertAfter => {
@@ -137,11 +144,18 @@ pub fn apply_patch_against_document(doc: &Document, patch: &PatchV1) -> Result<D
                     .as_deref()
                     .ok_or_else(|| "ops delete missing before (should be validated)".to_string())?;
 
+                let occ = op
+                    .occurrence
+                    .ok_or_else(|| "ops delete missing occurrence (should be validated)".to_string())?;
+
                 let idx = find_doc_block_index(&out.blocks, &op.block_id)
                     .ok_or_else(|| format!("unknown block_id '{}'", op.block_id))?;
 
                 let current_text = out.blocks[idx].text.clone();
-                out.blocks[idx].text = current_text.replace(before, "");
+                out.blocks[idx].text = match occ {
+                    DeleteOccurrence::First => delete_first(&current_text, before),
+                    DeleteOccurrence::All => current_text.replace(before, ""),
+                };
             }
 
             OpType::InsertAfter => {
@@ -204,6 +218,11 @@ fn replace_first(haystack: &str, needle: &str, replacement: &str) -> String {
             out
         }
     }
+}
+
+/// Delete only the FIRST occurrence (deterministic).
+fn delete_first(haystack: &str, needle: &str) -> String {
+    replace_first(haystack, needle, "")
 }
 
 /// Deterministic inserted id: "<anchor>_ins", or "<anchor>_ins2", "_ins3", ...

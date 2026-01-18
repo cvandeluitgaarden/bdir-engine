@@ -1,7 +1,7 @@
 use bdir_core::model::Document;
 
 use crate::{
-    schema::{OpType, PatchV1},
+    schema::{DeleteOccurrence, OpType, PatchV1},
     EditPacketV1,
 };
 
@@ -64,6 +64,11 @@ pub fn validate_patch_with_options(
 
         match op.op {
             OpType::Replace => {
+                if op.occurrence.is_some() {
+                    return Err(format!(
+                        "ops[{i}] (replace) unexpected occurrence (only valid for delete)"
+                    ));
+                }
                 let before = op
                     .before
                     .as_deref()
@@ -88,6 +93,15 @@ pub fn validate_patch_with_options(
                     .as_deref()
                     .ok_or_else(|| format!("ops[{i}] (delete) missing before"))?;
 
+                let occ = op
+                    .occurrence
+                    .ok_or_else(|| format!("ops[{i}] (delete) missing occurrence"))?;
+
+                // Exhaustive match to keep semantics explicit.
+                let _ = match occ {
+                    DeleteOccurrence::First | DeleteOccurrence::All => occ,
+                };
+
                 guard_before(i, before, opts.min_before_len)?;
                 if !block.text.contains(before) {
                     return Err(format!(
@@ -98,6 +112,11 @@ pub fn validate_patch_with_options(
             }
 
             OpType::InsertAfter => {
+                if op.occurrence.is_some() {
+                    return Err(format!(
+                        "ops[{i}] (insert_after) unexpected occurrence (only valid for delete)"
+                    ));
+                }
                 let _content = op
                     .content
                     .as_deref()
@@ -109,6 +128,11 @@ pub fn validate_patch_with_options(
             }
 
             OpType::Suggest => {
+                if op.occurrence.is_some() {
+                    return Err(format!(
+                        "ops[{i}] (suggest) unexpected occurrence (only valid for delete)"
+                    ));
+                }
                 let msg = op
                     .message
                     .as_deref()
@@ -174,6 +198,11 @@ pub fn validate_patch_against_edit_packet_with_options(
 
         match op.op {
             OpType::Replace => {
+                if op.occurrence.is_some() {
+                    return Err(format!(
+                        "ops[{i}] (replace) unexpected occurrence (only valid for delete)"
+                    ));
+                }
                 let before = op
                     .before
                     .as_deref()
@@ -198,6 +227,14 @@ pub fn validate_patch_against_edit_packet_with_options(
                     .as_deref()
                     .ok_or_else(|| format!("ops[{i}] (delete) missing before"))?;
 
+                let occ = op
+                    .occurrence
+                    .ok_or_else(|| format!("ops[{i}] (delete) missing occurrence"))?;
+
+                let _ = match occ {
+                    DeleteOccurrence::First | DeleteOccurrence::All => occ,
+                };
+
                 guard_before(i, before, opts.min_before_len)?;
                 if !block_text.contains(before) {
                     return Err(format!(
@@ -208,6 +245,11 @@ pub fn validate_patch_against_edit_packet_with_options(
             }
 
             OpType::InsertAfter => {
+                if op.occurrence.is_some() {
+                    return Err(format!(
+                        "ops[{i}] (insert_after) unexpected occurrence (only valid for delete)"
+                    ));
+                }
                 let content = op
                     .content
                     .as_deref()
@@ -218,6 +260,11 @@ pub fn validate_patch_against_edit_packet_with_options(
             }
 
             OpType::Suggest => {
+                if op.occurrence.is_some() {
+                    return Err(format!(
+                        "ops[{i}] (suggest) unexpected occurrence (only valid for delete)"
+                    ));
+                }
                 let msg = op
                     .message
                     .as_deref()

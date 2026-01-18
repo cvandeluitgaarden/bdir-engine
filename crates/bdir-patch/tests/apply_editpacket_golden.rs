@@ -54,12 +54,28 @@ fn golden_delete_removes_all_occurrences() {
     let patch: PatchV1 = serde_json::from_value(json!({
         "v": 1,
         "ops": [
-            { "op": "delete", "blockId": "p2", "before": "DELETE_ME" }
+            { "op": "delete", "blockId": "p2", "before": "DELETE_ME", "occurrence": "all" }
         ]
     })).unwrap();
 
     let out = apply_patch_against_edit_packet(&packet, &patch).unwrap();
     assert_eq!(out.b[1].3.trim(), "");
+}
+
+#[test]
+fn golden_delete_removes_first_occurrence_only() {
+    let mut packet = baseline_packet();
+    packet.b[1].3 = "DELETE_ME DELETE_ME DELETE_ME".to_string();
+
+    let patch: PatchV1 = serde_json::from_value(json!({
+        "v": 1,
+        "ops": [
+            { "op": "delete", "blockId": "p2", "before": "DELETE_ME", "occurrence": "first" }
+        ]
+    })).unwrap();
+
+    let out = apply_patch_against_edit_packet(&packet, &patch).unwrap();
+    assert_eq!(out.b[1].3.trim(), "DELETE_ME DELETE_ME");
 }
 
 #[test]
