@@ -50,8 +50,11 @@ pub mod patch {
     pub use bdir_patch::{
         apply_patch_against_edit_packet,
         apply_patch_against_document,
+        ValidateOptions,
         validate_patch,
+        validate_patch_with_options,
         validate_patch_against_edit_packet,
+        validate_patch_against_edit_packet_with_options,
     };
 }
 
@@ -68,7 +71,13 @@ pub mod prelude {
 /// Internal validation helpers.
 #[doc(hidden)]
 pub mod validate {
-    pub use bdir_patch::{validate_patch, validate_patch_against_edit_packet};
+    pub use bdir_patch::{
+        ValidateOptions,
+        validate_patch,
+        validate_patch_with_options,
+        validate_patch_against_edit_packet,
+        validate_patch_against_edit_packet_with_options,
+    };
 }
 
 /// Internal application helpers.

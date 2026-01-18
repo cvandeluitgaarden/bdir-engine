@@ -1,6 +1,27 @@
 use bdir_core::model::Document;
 
-use crate::{EditPacketV1, schema::{OpType, PatchV1}};
+use crate::{
+    schema::{OpType, PatchV1},
+    EditPacketV1,
+};
+
+/// Validator configuration options.
+///
+/// These options exist to make safety / strictness trade-offs explicit and testable.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ValidateOptions {
+    /// Minimum character length for `before` substrings.
+    ///
+    /// Short `before` strings can be ambiguous and match unintended parts of a block.
+    pub min_before_len: usize,
+}
+
+impl Default for ValidateOptions {
+    fn default() -> Self {
+        // Conservative default (matches pre-feature behavior).
+        Self { min_before_len: 8 }
+    }
+}
 
 /// Validate a patch against a document. Strict and fail-fast.
 ///
@@ -11,6 +32,15 @@ use crate::{EditPacketV1, schema::{OpType, PatchV1}};
 /// - `before` (when required) must be found in the block text
 /// - optional guard: reject very short `before` strings (ambiguity)
 pub fn validate_patch(doc: &Document, patch: &PatchV1) -> Result<(), String> {
+    validate_patch_with_options(doc, patch, ValidateOptions::default())
+}
+
+/// Validate a patch against a document with configurable validator options.
+pub fn validate_patch_with_options(
+    doc: &Document,
+    patch: &PatchV1,
+    opts: ValidateOptions,
+) -> Result<(), String> {
     if patch.v != 1 {
         return Err(format!("unsupported patch version {}", patch.v));
     }
@@ -43,7 +73,7 @@ pub fn validate_patch(doc: &Document, patch: &PatchV1) -> Result<(), String> {
                     .as_deref()
                     .ok_or_else(|| format!("ops[{i}] (replace) missing after"))?;
 
-                guard_before(i, before)?;
+                guard_before(i, before, opts.min_before_len)?;
                 if !block.text.contains(before) {
                     return Err(format!(
                         "ops[{i}] (replace) before substring not found in block '{}'",
@@ -58,7 +88,7 @@ pub fn validate_patch(doc: &Document, patch: &PatchV1) -> Result<(), String> {
                     .as_deref()
                     .ok_or_else(|| format!("ops[{i}] (delete) missing before"))?;
 
-                guard_before(i, before)?;
+                guard_before(i, before, opts.min_before_len)?;
                 if !block.text.contains(before) {
                     return Err(format!(
                         "ops[{i}] (delete) before substring not found in block '{}'",
@@ -93,21 +123,28 @@ pub fn validate_patch(doc: &Document, patch: &PatchV1) -> Result<(), String> {
     Ok(())
 }
 
-fn guard_before(i: usize, before: &str) -> Result<(), String> {
-    const MIN_BEFORE_LEN: usize = 8;
-
+fn guard_before(i: usize, before: &str, min_before_len: usize) -> Result<(), String> {
     if before.trim().is_empty() {
         return Err(format!("ops[{i}] before is empty/whitespace"));
     }
-    if before.chars().count() < MIN_BEFORE_LEN {
+    if before.chars().count() < min_before_len {
         return Err(format!(
-            "ops[{i}] before is too short (<{MIN_BEFORE_LEN} chars); likely ambiguous"
+            "ops[{i}] before is too short (<{min_before_len} chars); likely ambiguous"
         ));
     }
     Ok(())
 }
 
 pub fn validate_patch_against_edit_packet(packet: &EditPacketV1, patch: &PatchV1) -> Result<(), String> {
+    validate_patch_against_edit_packet_with_options(packet, patch, ValidateOptions::default())
+}
+
+/// Validate a patch against an edit packet with configurable validator options.
+pub fn validate_patch_against_edit_packet_with_options(
+    packet: &EditPacketV1,
+    patch: &PatchV1,
+    opts: ValidateOptions,
+) -> Result<(), String> {
     if patch.v != 1 {
         return Err(format!("unsupported patch version {}", patch.v));
     }
@@ -146,7 +183,7 @@ pub fn validate_patch_against_edit_packet(packet: &EditPacketV1, patch: &PatchV1
                     .as_deref()
                     .ok_or_else(|| format!("ops[{i}] (replace) missing after"))?;
 
-                guard_before(i, before)?;
+                guard_before(i, before, opts.min_before_len)?;
                 if !block_text.contains(before) {
                     return Err(format!(
                         "ops[{i}] (replace) before substring not found in block '{}'",
@@ -161,7 +198,7 @@ pub fn validate_patch_against_edit_packet(packet: &EditPacketV1, patch: &PatchV1
                     .as_deref()
                     .ok_or_else(|| format!("ops[{i}] (delete) missing before"))?;
 
-                guard_before(i, before)?;
+                guard_before(i, before, opts.min_before_len)?;
                 if !block_text.contains(before) {
                     return Err(format!(
                         "ops[{i}] (delete) before substring not found in block '{}'",

@@ -50,6 +50,13 @@ enum Command {
         edit_packet: String,
         /// Patch JSON path (bdir-patch::PatchV1)
         patch: String,
+
+        /// Minimum length for `before` substrings used by replace/delete operations.
+        ///
+        /// Default is conservative (currently 8). Lowering this allows short fixes like
+        /// "teh" -> "the" at the expense of potential ambiguity.
+        #[arg(long = "min-before-len")]
+        min_before_len: Option<usize>,
     },
 
     /// Apply a Patch.
@@ -168,7 +175,7 @@ fn main() -> anyhow::Result<()> {
             println!("{out}");
         }
 
-        Command::ValidatePatch { edit_packet, patch } => {
+        Command::ValidatePatch { edit_packet, patch, min_before_len } => {
             use std::process;
 
             let packet_s = match fs::read_to_string(&edit_packet) {
@@ -203,7 +210,12 @@ fn main() -> anyhow::Result<()> {
                 }
             };
 
-            match patch::validate_patch_against_edit_packet(&packet, &patch) {
+            let opts = match min_before_len {
+                Some(n) => patch::ValidateOptions { min_before_len: n },
+                None => patch::ValidateOptions::default(),
+            };
+
+            match patch::validate_patch_against_edit_packet_with_options(&packet, &patch, opts) {
                 Ok(()) => {
                     println!("OK");
                     process::exit(0);

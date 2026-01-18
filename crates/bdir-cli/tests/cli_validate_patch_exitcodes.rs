@@ -42,3 +42,20 @@ fn validate_patch_invalid_exits_2_and_prints_error_to_stderr() {
         .code(2)
         .stderr(predicate::str::contains("before is too short"));
 }
+
+#[test]
+fn validate_patch_short_before_can_be_allowed_with_flag() {
+    let packet = edit_packet_path();
+    let patch = patch_fixture_path("patch.before_too_short.json");
+
+    let mut cmd = cargo_bin_cmd!("bdir");
+    cmd.args([
+        "validate-patch",
+        packet.to_str().unwrap(),
+        patch.to_str().unwrap(),
+        "--min-before-len",
+        "4",
+    ]);
+
+    cmd.assert().success().code(0).stdout("OK\n");
+}

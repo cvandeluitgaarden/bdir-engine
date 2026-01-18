@@ -1,7 +1,7 @@
 mod util;
 
 use bdir_core::model::Document;
-use bdir_patch::{validate_patch, PatchV1};
+use bdir_patch::{ValidateOptions, validate_patch, validate_patch_with_options, PatchV1};
 
 fn load_doc() -> Document {
     let json = util::read_example_document_json();
@@ -57,6 +57,17 @@ fn before_too_short_fails_with_stable_message() {
         err,
         "ops[0] before is too short (<8 chars); likely ambiguous"
     );
+}
+
+#[test]
+fn before_too_short_can_be_enabled_via_options() {
+    let doc = load_doc();
+    let patch = load_patch("patch.before_too_short.json");
+
+    // The fixture uses a short `before`. By default it is rejected (see test above),
+    // but it can be allowed by explicitly lowering the guard.
+    validate_patch_with_options(&doc, &patch, ValidateOptions { min_before_len: 4 })
+        .expect("short before should be accepted when configured");
 }
 
 #[test]
