@@ -4,8 +4,7 @@
     {
       "op": "delete",
       "blockId": "p1",
-      "before": "this substring is not present",
-      "occurrence": "all"
+      "before": "example paragraph"
     }
   ]
 }

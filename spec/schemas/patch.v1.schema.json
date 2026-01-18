@@ -26,6 +26,7 @@
         "blockId": { "type": "string", "minLength": 1 },
         "before": { "type": "string" },
         "after": { "type": "string" },
+        "occurrence": { "type": "string", "enum": ["first", "all"] },
         "content": { "type": "string" },
         "message": { "type": "string" }
       },
@@ -36,7 +37,7 @@
         },
         {
           "if": { "properties": { "op": { "const": "delete" } } },
-          "then": { "required": ["before"] }
+          "then": { "required": ["before", "occurrence"] }
         },
         {
           "if": { "properties": { "op": { "const": "insert_after" } } },
