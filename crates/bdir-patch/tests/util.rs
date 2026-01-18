@@ -1,11 +1,13 @@
 use std::path::{Path, PathBuf};
 
+#[allow(dead_code)]
 pub fn workspace_root() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("..")
         .join("..")
 }
 
+#[allow(dead_code)]
 pub fn read_example_document_json() -> String {
     let path = workspace_root().join("examples").join("document.json");
     std::fs::read_to_string(&path).unwrap_or_else(|e| {

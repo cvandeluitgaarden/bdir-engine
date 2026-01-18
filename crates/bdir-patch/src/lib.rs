@@ -8,6 +8,7 @@ Use `bdir-io` instead.
 "#]
 
 pub mod apply;
+pub mod canonicalize;
 pub mod diagnostics;
 pub mod schema;
 pub mod validate;
@@ -25,6 +26,11 @@ pub use apply::{
 pub use diagnostics::{DiagnosticCode, ValidationDiagnostic, ValidationError};
 pub use telemetry::PatchTelemetry;
 pub use schema::{OpType, PatchOpV1, PatchV1};
+pub use canonicalize::{
+    canonicalize_patch_ops,
+    canonicalize_patch_ops_against_edit_packet,
+    CanonicalizeOptions,
+};
 pub use validate::{
     KindCodePolicy,
     ValidateOptions,

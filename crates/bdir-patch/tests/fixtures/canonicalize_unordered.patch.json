@@ -1,0 +1,9 @@
+{
+  "v": 1,
+  "ops": [
+    { "op": "suggest", "blockId": "p2", "message": "Consider simplifying." },
+    { "op": "replace", "blockId": "p1", "before": "teh first", "after": "the first" },
+    { "op": "delete", "blockId": "p1", "before": "DELETE_ME", "occurrence": "all" },
+    { "op": "insert_after", "blockId": "p1", "content": "Inserted block text." }
+  ]
+}

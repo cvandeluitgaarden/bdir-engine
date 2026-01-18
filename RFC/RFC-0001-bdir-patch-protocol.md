@@ -198,6 +198,18 @@ For `replace` and `delete` operations:
 - The substring MUST match verbatim within the target block text
 
 Failure of any validation step **MUST** result in rejection of the entire patch.
+### 8.4 Canonical operation ordering (Determinism)
+
+Patch `ops` arrays have no semantic ordering requirement in this RFC; however, implementations **SHOULD** canonicalize operation ordering before storing, hashing, caching, diffing, or displaying patches. Canonical ordering reduces review noise and enables deterministic cache keys.
+
+When canonicalizing, implementations **SHOULD** sort operations by:
+
+1. `blockId` ascending (lexicographic), or by the block's document order when the source Edit Packet is available
+2. Operation type in this order: `delete`, `replace`, `insert_after`, `suggest`
+3. Operation-specific fields (`before`, `after`, `content`, `message`, `occurrence`)
+
+If any ties remain, implementations **SHOULD** apply a deterministic tie-breaker (e.g., original index).
+
 
 ---
 
