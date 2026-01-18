@@ -18,6 +18,8 @@ pub enum DiagnosticCode {
     BeforeEmpty,
     BeforeTooShort,
     BeforeNotFound,
+    /// The target block's kindCode is not allowed under strict kindCode policy enforcement.
+    KindCodeDisallowed,
     ContentEmpty,
     MessageEmpty,
 }

@@ -77,6 +77,21 @@ enum Command {
         #[arg(long = "min-before-len")]
         min_before_len: Option<usize>,
 
+        /// Enable strict kindCode policy enforcement.
+        ///
+        /// When enabled, validation rejects any op targeting a block whose kindCode
+        /// is not allowed. Defaults to allowing kindCodes 0-19 (Core + Medium) and
+        /// allowing `suggest` ops on any kindCode.
+        #[arg(long = "strict-kindcode")]
+        strict_kindcode: bool,
+
+        /// Allowed kindCode filter/ranges (repeatable) used only when --strict-kindcode is set.
+        ///
+        /// Supports single values and ranges like `2-5`, `0..19`, `0..=19`.
+        /// If omitted, the default policy is 0-19.
+        #[arg(long = "kindcode-allow")]
+        kindcode_allow: Vec<String>,
+
         /// Print machine-readable JSON diagnostics to stderr on validation failure.
         #[arg(long = "diagnostics-json")]
         diagnostics_json: bool,
@@ -110,6 +125,14 @@ enum Command {
         /// Output minified JSON
         #[arg(long)]
         min: bool,
+
+        /// Enable strict kindCode policy enforcement during patch application.
+        #[arg(long = "strict-kindcode")]
+        strict_kindcode: bool,
+
+        /// Allowed kindCode filter/ranges (repeatable) used only when --strict-kindcode is set.
+        #[arg(long = "kindcode-allow")]
+        kindcode_allow: Vec<String>,
     },
 }
 
@@ -202,6 +225,8 @@ fn main() -> anyhow::Result<()> {
             edit_packet,
             patch,
             min_before_len,
+            strict_kindcode,
+            kindcode_allow,
             diagnostics_json,
         } => {
             use std::process;
@@ -256,10 +281,23 @@ fn main() -> anyhow::Result<()> {
                 }
             };
 
-            let opts = match min_before_len {
-                Some(n) => patch::ValidateOptions { min_before_len: n },
-                None => patch::ValidateOptions::default(),
-            };
+            let mut opts = patch::ValidateOptions::default();
+            if let Some(n) = min_before_len {
+                opts.min_before_len = n;
+            }
+            if strict_kindcode {
+                opts.strict_kind_code = true;
+                if !kindcode_allow.is_empty() {
+                    let ranges = parse_kind_filters(&kindcode_allow).unwrap_or_else(|e| {
+                        eprintln!("{e}");
+                        process::exit(1);
+                    });
+                    opts.kind_code_policy = patch::KindCodePolicy {
+                        allow_ranges: ranges,
+                        allow_suggest_any: true,
+                    };
+                }
+            }
 
             match patch::validate_patch_against_edit_packet_with_diagnostics(&packet, &patch, opts) {
                 Ok(()) => {
@@ -286,8 +324,25 @@ fn main() -> anyhow::Result<()> {
             patch_flag,
             out,
             min,
+            strict_kindcode,
+            kindcode_allow,
         } => {
             use std::process;
+
+            let mut opts = patch::ValidateOptions::default();
+            if strict_kindcode {
+                opts.strict_kind_code = true;
+                if !kindcode_allow.is_empty() {
+                    let ranges = parse_kind_filters(&kindcode_allow).unwrap_or_else(|e| {
+                        eprintln!("{e}");
+                        process::exit(1);
+                    });
+                    opts.kind_code_policy = patch::KindCodePolicy {
+                        allow_ranges: ranges,
+                        allow_suggest_any: true,
+                    };
+                }
+            }
 
             if let Some(doc_path) = doc {
                 // Document JSON pathway
@@ -345,7 +400,7 @@ fn main() -> anyhow::Result<()> {
                     }
                 };
 
-                let updated = match patch::apply_patch_against_document(&doc, &patch) {
+                let updated = match patch::apply_patch_against_document_with_options(&doc, &patch, opts.clone()) {
                     Ok(d) => d,
                     Err(msg) => {
                         eprintln!("{msg}");
@@ -432,7 +487,7 @@ fn main() -> anyhow::Result<()> {
                 }
             };
 
-            let updated = match patch::apply_patch_against_edit_packet(&packet, &patch) {
+            let updated = match patch::apply_patch_against_edit_packet_with_options(&packet, &patch, opts) {
                 Ok(p) => p,
                 Err(msg) => {
                     eprintln!("{msg}");

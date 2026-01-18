@@ -1,5 +1,10 @@
 use crate::schema::{DeleteOccurrence, OpType, PatchV1};
-use crate::validate::{validate_patch, validate_patch_against_edit_packet};
+use crate::validate::{
+    validate_patch,
+    validate_patch_with_options,
+    validate_patch_against_edit_packet_with_options,
+    ValidateOptions,
+};
 use bdir_core::hash::{hash_canon_hex, hash_hex};
 use bdir_core::model::{Block, Document};
 use bdir_editpacket::{BlockTupleV1, EditPacketV1};
@@ -19,8 +24,20 @@ pub fn apply_patch_against_edit_packet(
     packet: &EditPacketV1,
     patch: &PatchV1,
 ) -> Result<EditPacketV1, String> {
+    apply_patch_against_edit_packet_with_options(packet, patch, ValidateOptions::default())
+}
+
+/// Apply a patch against an Edit Packet with configurable validator options.
+///
+/// This enables optional strict validation (e.g. kindCode policy enforcement) while keeping
+/// the default behavior unchanged.
+pub fn apply_patch_against_edit_packet_with_options(
+    packet: &EditPacketV1,
+    patch: &PatchV1,
+    opts: ValidateOptions,
+) -> Result<EditPacketV1, String> {
     // Validate first (stable error messages come from validator).
-    validate_patch_against_edit_packet(packet, patch)?;
+    validate_patch_against_edit_packet_with_options(packet, patch, opts)?;
 
     // Support any algorithm implemented by bdir-core.
     let algo = packet.ha.as_str();
@@ -190,6 +207,16 @@ pub fn apply_patch_against_document(doc: &Document, patch: &PatchV1) -> Result<D
     out.recompute_hashes();
 
     Ok(out)
+}
+
+/// Apply a patch against a Document using custom validation options.
+pub fn apply_patch_against_document_with_options(
+    doc: &Document,
+    patch: &PatchV1,
+    opts: ValidateOptions,
+) -> Result<Document, String> {
+    validate_patch_with_options(doc, patch, opts)?;
+    apply_patch_against_document(doc, patch)
 }
 
 fn find_block_index(blocks: &[BlockTupleV1], block_id: &str) -> Option<usize> {

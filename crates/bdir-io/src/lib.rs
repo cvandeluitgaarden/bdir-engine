@@ -50,7 +50,10 @@ pub mod patch {
     pub use bdir_patch::{DiagnosticCode, ValidationDiagnostic, ValidationError};
     pub use bdir_patch::{
         apply_patch_against_edit_packet,
+        apply_patch_against_edit_packet_with_options,
         apply_patch_against_document,
+        apply_patch_against_document_with_options,
+        KindCodePolicy,
         ValidateOptions,
         validate_patch,
         validate_patch_with_options,
@@ -76,6 +79,7 @@ pub mod prelude {
 #[doc(hidden)]
 pub mod validate {
     pub use bdir_patch::{
+        KindCodePolicy,
         ValidateOptions,
         validate_patch,
         validate_patch_with_options,

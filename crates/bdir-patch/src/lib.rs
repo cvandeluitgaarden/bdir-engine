@@ -13,10 +13,16 @@ pub mod schema;
 pub mod validate;
 
 pub use bdir_editpacket::schema::{EditPacketV1, BlockTupleV1};
-pub use apply::{apply_patch_against_edit_packet, apply_patch_against_document};
+pub use apply::{
+    apply_patch_against_edit_packet,
+    apply_patch_against_edit_packet_with_options,
+    apply_patch_against_document,
+    apply_patch_against_document_with_options,
+};
 pub use diagnostics::{DiagnosticCode, ValidationDiagnostic, ValidationError};
 pub use schema::{OpType, PatchOpV1, PatchV1};
 pub use validate::{
+    KindCodePolicy,
     ValidateOptions,
     validate_patch,
     validate_patch_with_options,

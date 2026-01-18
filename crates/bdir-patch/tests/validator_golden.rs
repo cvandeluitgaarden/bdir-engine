@@ -96,7 +96,14 @@ fn before_too_short_can_be_enabled_via_options() {
 
     // The fixture uses a short `before`. By default it is rejected (see test above),
     // but it can be allowed by explicitly lowering the guard.
-    validate_patch_with_options(&doc, &patch, ValidateOptions { min_before_len: 4 })
+    validate_patch_with_options(
+        &doc,
+        &patch,
+        ValidateOptions {
+            min_before_len: 4,
+            ..ValidateOptions::default()
+        },
+    )
         .expect("short before should be accepted when configured");
 }
 

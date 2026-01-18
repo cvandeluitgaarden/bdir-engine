@@ -6,22 +6,120 @@ use crate::{
     EditPacketV1,
 };
 
+/// kindCode enforcement policy.
+///
+/// When strict mode is enabled, patch validation rejects any op that targets a block
+/// whose `kindCode` is not allowed by this policy.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct KindCodePolicy {
+    /// Allowed inclusive kindCode ranges.
+    ///
+    /// Example: `[(0, 19)]` allows core + medium-importance content per RFC-0001.
+    pub allow_ranges: Vec<(u16, u16)>,
+
+    /// If true, `suggest` ops are allowed for any kindCode.
+    ///
+    /// This preserves the ability to attach non-mutating guidance to boilerplate/UI
+    /// blocks while still blocking mutations.
+    pub allow_suggest_any: bool,
+}
+
+impl Default for KindCodePolicy {
+    fn default() -> Self {
+        Self {
+            // Conservative default aligned with RFC-0001 importance tiers.
+            // 0–19 is Core (0–9) + Medium (10–19).
+            allow_ranges: vec![(0, 19)],
+            allow_suggest_any: true,
+        }
+    }
+}
+
+impl KindCodePolicy {
+    fn allows(&self, op: OpType, kind_code: u16) -> bool {
+        if op == OpType::Suggest && self.allow_suggest_any {
+            return true;
+        }
+        self.allow_ranges
+            .iter()
+            .any(|(lo, hi)| (*lo..=*hi).contains(&kind_code))
+    }
+}
+
 /// Validator configuration options.
 ///
 /// These options exist to make safety / strictness trade-offs explicit and testable.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ValidateOptions {
     /// Minimum character length for `before` substrings.
     ///
     /// Short `before` strings can be ambiguous and match unintended parts of a block.
     pub min_before_len: usize,
+
+    /// Enable strict kindCode policy enforcement.
+    ///
+    /// When true, validators MUST reject any op targeting a block whose kindCode is
+    /// disallowed by `kind_code_policy`.
+    pub strict_kind_code: bool,
+
+    /// Policy used when `strict_kind_code` is enabled.
+    ///
+    /// Defaults to allowing kindCodes 0–19 (Core + Medium) and allowing `suggest` on any kindCode.
+    pub kind_code_policy: KindCodePolicy,
 }
 
 impl Default for ValidateOptions {
     fn default() -> Self {
         // Conservative default (matches pre-feature behavior).
-        Self { min_before_len: 8 }
+        Self {
+            min_before_len: 8,
+            strict_kind_code: false,
+            kind_code_policy: KindCodePolicy::default(),
+        }
     }
+}
+
+fn enforce_kind_code(
+    i: usize,
+    op: OpType,
+    block_id: &str,
+    kind_code: u16,
+    opts: &ValidateOptions,
+) -> Result<(), ValidationError> {
+    if !opts.strict_kind_code {
+        return Ok(());
+    }
+
+    if opts.kind_code_policy.allows(op, kind_code) {
+        return Ok(());
+    }
+
+    let policy_summary = if opts.kind_code_policy.allow_ranges.is_empty() {
+        "allow_ranges=[]".to_string()
+    } else {
+        let ranges = opts
+            .kind_code_policy
+            .allow_ranges
+            .iter()
+            .map(|(lo, hi)| format!("{lo}-{hi}"))
+            .collect::<Vec<_>>()
+            .join(",");
+        format!(
+            "allow_ranges=[{ranges}], allow_suggest_any={}",
+            opts.kind_code_policy.allow_suggest_any
+        )
+    };
+
+    Err(err_op(
+        DiagnosticCode::KindCodeDisallowed,
+        i,
+        op,
+        Some(block_id.to_string()),
+        Some(format!("ops[{i}].block_id")),
+        format!(
+            "ops[{i}] targets kindCode {kind_code}, which is disallowed under strict kindCode policy ({policy_summary})"
+        ),
+    ))
 }
 
 /// Validate a patch against a document. Strict and fail-fast.
@@ -88,6 +186,9 @@ pub fn validate_patch_with_diagnostics(
                     format!("ops[{i}] references unknown block_id '{}'", op.block_id),
                 )
             })?;
+
+        // Optional strict safety gate: enforce kindCode policy.
+        enforce_kind_code(i, op.op, &op.block_id, block.kind_code, &opts)?;
 
         match op.op {
             OpType::Replace => {
@@ -348,6 +449,10 @@ pub fn validate_patch_against_edit_packet_with_diagnostics(
                 format!("ops[{i}] references unknown block_id '{}'", op.block_id),
             )
         })?;
+
+        // Optional strict safety gate: enforce kindCode policy.
+        // tuple layout: (id, kind, text_hash, text)
+        enforce_kind_code(i, op.op, &op.block_id, block.1, &opts)?;
 
         // tuple layout: (id, kind, text_hash, text)
         let block_text = &block.3;
