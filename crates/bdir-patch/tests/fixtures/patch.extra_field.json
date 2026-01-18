@@ -1,0 +1,12 @@
+{
+  "v": 1,
+  "tid": "t_000",
+  "ops": [
+    {
+      "op": "suggest",
+      "block_id": "b_0000000000000000",
+      "message": "hi"
+    }
+  ],
+  "extra": true
+}

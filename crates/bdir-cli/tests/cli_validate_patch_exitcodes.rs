@@ -59,3 +59,14 @@ fn validate_patch_short_before_can_be_allowed_with_flag() {
 
     cmd.assert().success().code(0).stdout("OK\n");
 }
+
+#[test]
+fn validate_patch_schema_invalid_exits_1() {
+    let packet = edit_packet_path();
+    let patch = patch_fixture_path("patch.extra_field.json");
+
+    let mut cmd = cargo_bin_cmd!("bdir");
+    cmd.args(["validate-patch", packet.to_str().unwrap(), patch.to_str().unwrap()]);
+
+    cmd.assert().failure().code(1);
+}

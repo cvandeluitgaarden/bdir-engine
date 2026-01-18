@@ -2,9 +2,28 @@ use clap::{Parser, Subcommand};
 use std::fs;
 
 use bdir_io::{core::Document, editpacket, patch};
+use jsonschema::Validator;
+use once_cell::sync::Lazy;
+use serde_json::Value;
 use std::io::{self, IsTerminal, Write};
 
 const INSPECT_PREVIEW_MAX_CHARS: usize = 80;
+
+// Compile the normative RFC schemas once per process.
+//
+// NOTE: Using include_str! keeps the CLI deterministic and avoids depending on a
+// working directory at runtime.
+static EDIT_PACKET_V1_SCHEMA: Lazy<Validator> = Lazy::new(|| {
+    let schema: Value = serde_json::from_str(include_str!("../../../spec/schemas/edit-packet.v1.schema.json"))
+        .expect("invalid embedded edit-packet.v1.schema.json");
+    Validator::new(&schema).expect("failed to compile edit packet schema")
+});
+
+static PATCH_V1_SCHEMA: Lazy<Validator> = Lazy::new(|| {
+    let schema: Value = serde_json::from_str(include_str!("../../../spec/schemas/patch.v1.schema.json"))
+        .expect("invalid embedded patch.v1.schema.json");
+    Validator::new(&schema).expect("failed to compile patch schema")
+});
 
 #[derive(Debug, Parser)]
 #[command(name = "bdir", version, about = "BDIR Patch Protocol MVP CLI")]
@@ -186,7 +205,16 @@ fn main() -> anyhow::Result<()> {
                 }
             };
 
-            let packet: editpacket::EditPacketV1 = match serde_json::from_str(&packet_s) {
+            let packet_val: Value = match serde_json::from_str(&packet_s) {
+                Ok(v) => v,
+                Err(e) => {
+                    eprintln!("{e}");
+                    process::exit(1);
+                }
+            };
+            validate_json_or_exit(&EDIT_PACKET_V1_SCHEMA, &packet_val);
+
+            let packet: editpacket::EditPacketV1 = match serde_json::from_value(packet_val) {
                 Ok(p) => p,
                 Err(e) => {
                     eprintln!("{e}");
@@ -202,7 +230,16 @@ fn main() -> anyhow::Result<()> {
                 }
             };
 
-            let patch: patch::PatchV1 = match serde_json::from_str(&patch_s) {
+            let patch_val: Value = match serde_json::from_str(&patch_s) {
+                Ok(v) => v,
+                Err(e) => {
+                    eprintln!("{e}");
+                    process::exit(1);
+                }
+            };
+            validate_json_or_exit(&PATCH_V1_SCHEMA, &patch_val);
+
+            let patch: patch::PatchV1 = match serde_json::from_value(patch_val) {
                 Ok(p) => p,
                 Err(e) => {
                     eprintln!("{e}");
@@ -276,7 +313,16 @@ fn main() -> anyhow::Result<()> {
                     }
                 };
 
-                let patch: patch::PatchV1 = match serde_json::from_str(&patch_s) {
+                let patch_val: Value = match serde_json::from_str(&patch_s) {
+                    Ok(v) => v,
+                    Err(e) => {
+                        eprintln!("{e}");
+                        process::exit(1);
+                    }
+                };
+                validate_json_or_exit(&PATCH_V1_SCHEMA, &patch_val);
+
+                let patch: patch::PatchV1 = match serde_json::from_value(patch_val) {
                     Ok(p) => p,
                     Err(e) => {
                         eprintln!("{e}");
@@ -329,7 +375,16 @@ fn main() -> anyhow::Result<()> {
                 }
             };
 
-            let packet: editpacket::EditPacketV1 = match serde_json::from_str(&packet_s) {
+            let packet_val: Value = match serde_json::from_str(&packet_s) {
+                Ok(v) => v,
+                Err(e) => {
+                    eprintln!("{e}");
+                    process::exit(1);
+                }
+            };
+            validate_json_or_exit(&EDIT_PACKET_V1_SCHEMA, &packet_val);
+
+            let packet: editpacket::EditPacketV1 = match serde_json::from_value(packet_val) {
                 Ok(p) => p,
                 Err(e) => {
                     eprintln!("{e}");
@@ -345,7 +400,16 @@ fn main() -> anyhow::Result<()> {
                 }
             };
 
-            let patch: patch::PatchV1 = match serde_json::from_str(&patch_s) {
+            let patch_val: Value = match serde_json::from_str(&patch_s) {
+                Ok(v) => v,
+                Err(e) => {
+                    eprintln!("{e}");
+                    process::exit(1);
+                }
+            };
+            validate_json_or_exit(&PATCH_V1_SCHEMA, &patch_val);
+
+            let patch: patch::PatchV1 = match serde_json::from_value(patch_val) {
                 Ok(p) => p,
                 Err(e) => {
                     eprintln!("{e}");
@@ -373,6 +437,18 @@ fn main() -> anyhow::Result<()> {
     }
 
     Ok(())
+}
+
+fn validate_json_or_exit(validator: &Validator, instance: &Value) {
+    let errors: Vec<_> = validator.iter_errors(instance).collect();
+    if errors.is_empty() {
+        return;
+    }
+
+    for err in errors {
+        eprintln!("{err}");
+    }
+    std::process::exit(1);
 }
 
 fn make_preview(s: &str, max_chars: usize) -> String {
