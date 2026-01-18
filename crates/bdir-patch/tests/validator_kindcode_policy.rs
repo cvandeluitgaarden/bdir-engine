@@ -83,7 +83,7 @@ fn strict_kindcode_allows_custom_ranges() {
         ops: vec![PatchOpV1 {
             op: OpType::Delete,
             block_id: "boiler".to_string(),
-            before: Some("Cookie".to_string()),
+            before: Some("Cookie banner".to_string()),
             after: None,
             occurrence: Some(bdir_patch::schema::DeleteOccurrence::First),
             content: None,
