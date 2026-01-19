@@ -202,6 +202,7 @@ dependencies = [
 name = "bdir-patch"
 version = "0.1.0"
 dependencies = [
+ "bdir-codebook",
  "bdir-core",
  "bdir-editpacket",
  "proptest",
