@@ -63,8 +63,33 @@ An atomic unit of content identified by a stable identifier.
 
 All JSON field names defined by this specification **MUST** use **snake_case**.
 
-- Implementations **MUST** emit canonical protocol objects using snake_case.
+This requirement applies to the v1 JSON wire formats defined in this document, including:
+
+- the Edit Packet (Section 6)
+- patches and patch operations (Section 8)
+
+- Implementations **MUST** emit canonical v1 protocol objects using snake_case.
 - Other casings (e.g. camelCase) are **non-canonical** and require explicit adapters.
+
+> **Non-normative compatibility note**
+>
+> Receivers **MAY** accept alternate spellings (for example, camelCase variants) via explicit adapters, but implementations **MUST NOT** emit non-canonical field names when producing v1 Edit Packets or patches.
+
+## 2.2 Unicode Normalization (Normative)
+
+This protocol operates on JSON strings, which are Unicode text. Many Unicode sequences have multiple equivalent representations (for example, precomposed characters versus combining sequences). Without explicit normalization rules, hash computation and substring matching can become non-interoperable.
+
+To preserve deterministic behavior across producers and receivers:
+
+- All canonical block `text` values (Section 6) **MUST** be normalized to **Unicode Normalization Form C (NFC)**.
+- All operation strings that are matched against or inserted into block text (**including** `before`, `after`, and `content`) **MUST** be normalized to **NFC**.
+- Receivers performing validation and application (Section 9) **MUST** compute hashes and perform substring matching against the NFC-normalized block text.
+
+Implementations **MUST NOT** use compatibility normalization (such as NFKC/NFKD) as part of the protocol’s canonicalization, because it can change user-visible semantics.
+
+> **Non-normative note**
+>
+> Normalization is required for interoperability, not for “cleaning up” content. Implementations should treat NFC as a deterministic, minimal canonicalization step that prevents spurious mismatches caused by equivalent Unicode representations.
 
 ---
 
@@ -204,6 +229,8 @@ The Edit Packet is encoded as a JSON object:
 - `h`  
   Page-level content hash. This value MUST match the hash of the BDIR content used to generate the packet, computed using the algorithm specified by `ha` (or the default baseline when `ha` is omitted).
 
+  The canonical input bytes for hash computation **MUST** be the UTF-8 encoding (without BOM) of the NFC-normalized canonical text (see Section 2.2).
+
 - `ha`  
   Hash algorithm identifier for `h` and block-level `text_hash` values.
 
@@ -225,7 +252,7 @@ Each block tuple has the following structure:
 ```
 
 - `block_id` MUST be stable across extractions
-- `text_hash` MUST correspond to the provided `text`
+- `text_hash` MUST correspond to the provided `text` (hash of the UTF-8 bytes of the NFC-normalized `text` using `ha`)
 - `text` MUST represent the canonical block content
 
 ---
@@ -249,6 +276,38 @@ AI systems SHOULD avoid proposing modifications to lower-importance blocks unles
 
 ## 8. Patch Instructions
 
+### 8.0 Patch wire format (Normative)
+
+A Patch is encoded as a JSON object:
+
+```json
+{
+  "v": 1,
+  "h": "page_content_hash",
+  "ha": "sha256",
+  "ops": [
+    { "op": "replace", "block_id": "p1", "before": "teh", "after": "the" }
+  ]
+}
+```
+
+Field semantics:
+
+- `v` (integer)
+  - Patch version. This RFC defines version `1`.
+
+- `h` (string)
+  - Page-level content hash binding for the patch.
+  - `h` **MUST** equal the Edit Packet `h` value the AI analyzed when producing
+    the patch.
+
+- `ha` (string, OPTIONAL)
+  - Hash algorithm identifier for `h`.
+  - If omitted, receivers **MUST** treat it as `"sha256"`.
+
+- `ops` (array)
+  - Ordered list of patch operations.
+
 ### 8.1 General Rules
 
 AI systems **MUST** output patch instructions rather than rewritten documents.
@@ -262,7 +321,73 @@ The protocol defines the following operation types:
 - `insert_after`
 - `suggest`
 
-### 8.2.1 `suggest` operation semantics
+### 8.2.1 `replace` operation semantics
+
+`replace` is a mutating operation that replaces an exact substring within an
+existing block.
+
+Required fields:
+
+- `op`: the literal string `"replace"`
+- `block_id`: the target block identifier
+- `before`: the exact substring expected to exist within the target block text
+- `after`: replacement text
+
+Optional fields:
+
+- `occurrence` (integer, 1-indexed)
+  - Used to disambiguate multiple matches of `before` within a single block.
+
+If `occurrence` is omitted and `before` matches more than once within the target
+block, receivers **MUST** reject the patch as ambiguous.
+
+**Occurrence selection (normative):**
+
+- Match counting is performed left-to-right over the target block text.
+- Matches are **non-overlapping**.
+- `occurrence: 1` selects the first match, `occurrence: 2` selects the second,
+  and so on.
+- If `occurrence` is present but exceeds the number of matches, receivers
+  **MUST** reject the patch.
+
+### 8.2.2 `delete` operation semantics
+
+`delete` is a mutating operation that removes an exact substring within an
+existing block.
+
+Required fields:
+
+- `op`: the literal string `"delete"`
+- `block_id`: the target block identifier
+- `before`: the exact substring to delete
+
+Optional fields:
+
+- `occurrence` (integer, 1-indexed)
+  - Used to disambiguate multiple matches of `before` within a single block.
+
+If `occurrence` is omitted and `before` matches more than once within the target
+block, receivers **MUST** reject the patch as ambiguous.
+
+**Occurrence selection (normative):** see Section 8.2.1.
+
+### 8.2.3 `insert_after` operation semantics
+
+`insert_after` is a mutating operation that inserts a **new block** immediately
+after an existing block.
+
+Required fields:
+
+- `op`: the literal string `"insert_after"`
+- `block_id`: the existing block after which the new block is inserted
+- `new_block_id`: identifier for the inserted block (MUST be unique within the
+  document)
+- `kind_code`: kind classification for the inserted block
+- `text`: canonical text content for the inserted block
+
+`insert_after` operations **MUST NOT** include `before` or `after` fields.
+
+### 8.2.4 `suggest` operation semantics
 
 The `suggest` operation is **non-mutating** and **advisory**. It exists to carry human-readable review notes that do not deterministically apply changes.
 
@@ -298,6 +423,20 @@ For `replace` and `delete` operations:
 
 - An exact `before` substring MUST be provided
 - The substring MUST match verbatim within the target block text
+- If `before` matches **zero times**, receivers **MUST** reject the patch
+- If `before` matches **more than once** and `occurrence` is omitted, receivers
+  **MUST** reject the patch as ambiguous
+- If `occurrence` is provided, receivers **MUST** validate and target exactly
+  the selected occurrence as defined in Section 8.2.1
+
+For `insert_after` operations:
+
+- `block_id` MUST reference an existing block
+- `new_block_id` MUST be present and MUST NOT conflict with any existing block
+  identifier in the target document
+- `kind_code` MUST be present
+- `text` MUST be present
+- `before` and `after` MUST NOT be present
 
 For `suggest` operations:
 
@@ -316,7 +455,7 @@ When canonicalizing, implementations **SHOULD** sort operations by:
 
 1. `block_id` ascending (lexicographic), or by the block's document order when the source Edit Packet is available
 2. Operation type in this order: `delete`, `replace`, `insert_after`, `suggest`
-3. Operation-specific fields (`before`, `after`, `content`, `message`, `occurrence`)
+3. Operation-specific fields (`before`, `after`, `text`, `message`, `occurrence`)
 
 If any ties remain, implementations **SHOULD** apply a deterministic tie-breaker (e.g., original index).
 
@@ -329,7 +468,20 @@ A patch MUST only be applied if all of the following conditions are met:
 
 1. The page-level content hash matches
 2. All referenced blocks exist
-3. All `before` substrings match exactly
+3. All `before` substrings match exactly and unambiguously
+
+For `replace` and `delete`, a `before` match is **unambiguous** only if:
+
+- it occurs exactly once within the target block text, OR
+- `occurrence` is provided to select a specific match (Section 8.2.1).
+
+The **page-level content hash** match requirement means:
+
+- The receiver MUST compute (or otherwise obtain) the current page-level content
+  hash for the target document using the algorithm specified by the patch `ha`
+  (defaulting to "sha256").
+- The receiver MUST compare that current value to the patch `h`.
+- If the values do not match, the receiver **MUST** reject the patch.
 
 Implementations MUST treat patch application as an all-or-nothing operation.
 
@@ -402,3 +554,20 @@ Such feedback will inform future revisions of this document.
 ### 15.2 Informative References
 
 - RFC 6902: *JavaScript Object Notation (JSON) Patch*
+
+
+---
+
+## Block Identifier Trust and Sanitization (Normative)
+
+`block_id` values MUST be treated as **untrusted input**.
+
+Implementations MUST NOT infer semantics, structure, paths, selectors, or execution meaning from a `block_id`.  
+A `block_id` MUST be handled as an **opaque identifier** and validated **only** by exact string equality against
+the set of blocks present in the referenced BDIR document.
+
+Implementations SHOULD sanitize `block_id` values before using them in logs, user interfaces, metrics, or persistent
+storage to prevent injection, log-forging, or tooling confusion issues.
+
+No protocol semantics depend on the internal structure of a `block_id`. Any meaning beyond identity is explicitly
+out of scope.
