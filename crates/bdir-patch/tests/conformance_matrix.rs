@@ -26,13 +26,13 @@ fn baseline_packet() -> EditPacketV1 {
 fn conformance_matrix() {
     let packet = baseline_packet();
 
-    let cases = vec![
+    let mut cases = vec![
         Case {
             id: "G1",
             should_pass: true,
             patch: serde_json::from_value(json!({
                 "v": 1,
-                "ops": [{ "op": "replace", "block_id": "p1", "before": "teh first", "after": "the first" }]
+                "ops": [{ "op": "replace", "block_id": "p1", "before": "teh first", "after": "the first" }],
             })).unwrap(),
         },
         Case {
@@ -52,6 +52,10 @@ fn conformance_matrix() {
             })).unwrap(),
         },
     ];
+
+    for c in &mut cases {
+        c.patch.h = Some(packet.h.clone());
+    }
 
     let mut passed = 0usize;
     let total = cases.len();

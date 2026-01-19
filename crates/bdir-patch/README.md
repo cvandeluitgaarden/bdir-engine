@@ -8,3 +8,14 @@ golden tests and a conformance matrix under:
 
 Changes to these tests are considered protocol-level changes and
 must be reviewed accordingly.
+
+## Safety: page hash binding
+
+Patch application and validation now require an explicit page-hash binding.
+
+A patch must either:
+- include `h` (the page-level hash from the Edit Packet / Document), **or**
+- be validated/applied with `ValidateOptions.expected_page_hash` provided out-of-band.
+
+This prevents accidental application of patches to a different page version.
+

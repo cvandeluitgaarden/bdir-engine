@@ -38,6 +38,7 @@ fn golden_replace_replaces_first_occurrence_only() {
         ]
     })).unwrap();
 
+    let patch = bind_patch_to_edit_packet(patch, &packet);
     let out = apply_patch_against_edit_packet(&packet, &patch).unwrap();
 
     let text = &out.b[0].3;
@@ -58,6 +59,7 @@ fn golden_delete_removes_all_occurrences() {
         ]
     })).unwrap();
 
+    let patch = bind_patch_to_edit_packet(patch, &packet);
     let out = apply_patch_against_edit_packet(&packet, &patch).unwrap();
     assert_eq!(out.b[1].3.trim(), "");
 }
@@ -74,6 +76,7 @@ fn golden_delete_removes_first_occurrence_only() {
         ]
     })).unwrap();
 
+    let patch = bind_patch_to_edit_packet(patch, &packet);
     let out = apply_patch_against_edit_packet(&packet, &patch).unwrap();
     assert_eq!(out.b[1].3.trim(), "DELETE_ME DELETE_ME");
 }
@@ -89,6 +92,7 @@ fn golden_insert_after_inserts_new_block_with_deterministic_id_and_inherited_kin
         ]
     })).unwrap();
 
+    let patch = bind_patch_to_edit_packet(patch, &packet);
     let out = apply_patch_against_edit_packet(&packet, &patch).unwrap();
 
     // Inserted immediately after p1
@@ -108,6 +112,7 @@ fn golden_suggest_is_non_mutating() {
         ]
     })).unwrap();
 
+    let patch = bind_patch_to_edit_packet(patch, &packet);
     let out = apply_patch_against_edit_packet(&packet, &patch).unwrap();
     assert_eq!(out.b[1].3, "This is the second paragraph.");
 }
@@ -123,6 +128,7 @@ fn reject_unknown_block_id() {
         ]
     })).unwrap();
 
+    let patch = bind_patch_to_edit_packet(patch, &packet);
     let err = apply_patch_against_edit_packet(&packet, &patch).unwrap_err();
     assert!(err.contains("references unknown block_id"));
 }
@@ -138,6 +144,12 @@ fn reject_before_too_short() {
         ]
     })).unwrap();
 
+    let patch = bind_patch_to_edit_packet(patch, &packet);
     let err = apply_patch_against_edit_packet(&packet, &patch).unwrap_err();
     assert!(err.contains("before is too short"));
+}
+
+fn bind_patch_to_edit_packet(mut patch: PatchV1, ep: &EditPacketV1) -> PatchV1 {
+    patch.h = Some(ep.h.clone());
+    patch
 }

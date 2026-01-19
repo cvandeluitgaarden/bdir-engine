@@ -15,13 +15,15 @@ fn apply_patch_against_document_updates_text_and_hashes() {
     .unwrap();
     doc.recompute_hashes();
 
-    let patch: PatchV1 = serde_json::from_value(json!({
+    let mut patch: PatchV1 = serde_json::from_value(json!({
         "v": 1,
         "ops": [
             {"op": "replace", "block_id": "p1", "before": "teh first", "after": "the first"}
         ]
     }))
     .unwrap();
+
+    patch.h = Some(doc.page_hash.clone());
 
     let updated = apply_patch_against_document(&doc, &patch).unwrap();
     assert!(updated.blocks[0].text.contains("the first paragraph"));

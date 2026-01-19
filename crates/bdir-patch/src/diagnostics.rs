@@ -12,6 +12,7 @@ pub enum DiagnosticCode {
     UnsupportedPatchVersion,
     UnsupportedEditPacketVersion,
     PatchPageHashMismatch,
+    PatchPageHashMissing,
     UnknownBlockId,
     MissingField,
     UnexpectedField,

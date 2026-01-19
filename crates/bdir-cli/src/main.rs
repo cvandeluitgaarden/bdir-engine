@@ -93,8 +93,12 @@ enum Command {
         #[arg(long = "kindcode-allow")]
         kindcode_allow: Vec<String>,
 
-        
-
+        /// Expected page-level hash binding when the patch does not include `h`.
+        ///
+        /// When provided, validation/application will require the target edit packet
+        /// to have this exact `h` value.
+        #[arg(long = "expected-page-hash")]
+        expected_page_hash: Option<String>,
 
         /// Emit PatchTelemetry JSON to stderr (deterministic, machine-readable).
         #[arg(long = "telemetry-json")]
@@ -140,6 +144,10 @@ enum Command {
         /// Allowed kindCode filter/ranges (repeatable) used only when --strict-kindcode is set.
         #[arg(long = "kindcode-allow")]
         kindcode_allow: Vec<String>,
+
+        /// Expected page-level hash binding when the patch does not include `h`.
+        #[arg(long = "expected-page-hash")]
+        expected_page_hash: Option<String>,
 
         /// Emit PatchTelemetry JSON to stderr (deterministic, machine-readable).
         #[arg(long = "telemetry-json")]
@@ -238,6 +246,7 @@ fn main() -> anyhow::Result<()> {
             min_before_len,
             strict_kindcode,
             kindcode_allow,
+            expected_page_hash,
             diagnostics_json,
             telemetry_json,
         } => {
@@ -297,6 +306,10 @@ fn main() -> anyhow::Result<()> {
             if let Some(n) = min_before_len {
                 opts.min_before_len = n;
             }
+            if let Some(h) = expected_page_hash.clone() {
+                opts.expected_page_hash = Some(h);
+            }
+
             if strict_kindcode {
                 opts.strict_kind_code = true;
                 if !kindcode_allow.is_empty() {
@@ -350,11 +363,16 @@ fn main() -> anyhow::Result<()> {
             min,
             strict_kindcode,
             kindcode_allow,
+            expected_page_hash,
             telemetry_json,
         } => {
             use std::process;
 
             let mut opts = patch::ValidateOptions::default();
+            if let Some(h) = expected_page_hash.clone() {
+                opts.expected_page_hash = Some(h);
+            }
+
             if strict_kindcode {
                 opts.strict_kind_code = true;
                 if !kindcode_allow.is_empty() {

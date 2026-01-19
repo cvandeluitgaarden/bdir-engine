@@ -23,6 +23,7 @@ proptest! {
         let packet = packet_with_text(text);
         let patch: PatchV1 = serde_json::from_value(json!({
             "v": 1,
+            "h": "pagehash123",
             "ops": [{ "op": "replace", "block_id": "p1", "before": needle, "after": after }]
         })).unwrap();
 

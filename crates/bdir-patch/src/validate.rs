@@ -65,6 +65,13 @@ pub struct ValidateOptions {
     ///
     /// Defaults to allowing kindCodes 0–19 (Core + Medium) and allowing `suggest` on any kindCode.
     pub kind_code_policy: KindCodePolicy,
+
+    /// Expected page-level hash when the patch itself is not bound via `h`.
+    ///
+    /// When set, validators treat this as the required page hash binding and
+    /// will reject patches whose `h` (if present) conflicts with it.
+    #[allow(dead_code)]
+    pub expected_page_hash: Option<String>,
 }
 
 impl Default for ValidateOptions {
@@ -74,6 +81,7 @@ impl Default for ValidateOptions {
             min_before_len: 8,
             strict_kind_code: false,
             kind_code_policy: KindCodePolicy::default(),
+            expected_page_hash: None,
         }
     }
 }
@@ -155,19 +163,44 @@ pub fn validate_patch_with_diagnostics(
             format!("unsupported patch version {}", patch.v),
         ));
     }
-
-    // Optional safety binding: ensure the patch is only applied to the intended page version.
-    if let Some(expected) = patch.h.as_deref() {
-        if doc.page_hash != expected {
+    // Safety binding: ensure the patch is only applied to the intended page version.
+    //
+    // A patch MUST be bound to a specific page hash either by including `h` in the patch,
+    // or by the caller providing an explicit `expected_page_hash` out-of-band.
+    let expected = match (patch.h.as_deref(), opts.expected_page_hash.as_deref()) {
+        (Some(patch_h), Some(expected_h)) => {
+            if patch_h != expected_h {
+                return Err(err_root(
+                    DiagnosticCode::PatchPageHashMismatch,
+                    "h",
+                    format!(
+                        "patch page hash mismatch (patch.h='{}' differs from expected_page_hash='{}')",
+                        patch_h, expected_h
+                    ),
+                ));
+            }
+            patch_h
+        }
+        (Some(patch_h), None) => patch_h,
+        (None, Some(expected_h)) => expected_h,
+        (None, None) => {
             return Err(err_root(
-                DiagnosticCode::PatchPageHashMismatch,
+                DiagnosticCode::PatchPageHashMissing,
                 "h",
-                format!(
-                    "patch page hash mismatch (expected '{}', got '{}')",
-                    expected, doc.page_hash
-                ),
+                "patch is missing required page hash binding: include patch.h or provide expected_page_hash".to_string(),
             ));
         }
+    };
+
+    if doc.page_hash != expected {
+        return Err(err_root(
+            DiagnosticCode::PatchPageHashMismatch,
+            "h",
+            format!(
+                "patch page hash mismatch (expected '{}', got '{}')",
+                expected, doc.page_hash
+            ),
+        ));
     }
 
     for (i, op) in patch.ops.iter().enumerate() {
@@ -485,19 +518,44 @@ pub fn validate_patch_against_edit_packet_with_diagnostics(
             format!("unsupported edit packet version {}", packet.v),
         ));
     }
-
-    // Optional safety binding: ensure the patch is only applied to the intended page version.
-    if let Some(expected) = patch.h.as_deref() {
-        if packet.h != expected {
+    // Safety binding: ensure the patch is only applied to the intended page version.
+    //
+    // A patch MUST be bound to a specific page hash either by including `h` in the patch,
+    // or by the caller providing an explicit `expected_page_hash` out-of-band.
+    let expected = match (patch.h.as_deref(), opts.expected_page_hash.as_deref()) {
+        (Some(patch_h), Some(expected_h)) => {
+            if patch_h != expected_h {
+                return Err(err_root(
+                    DiagnosticCode::PatchPageHashMismatch,
+                    "h",
+                    format!(
+                        "patch page hash mismatch (patch.h='{}' differs from expected_page_hash='{}')",
+                        patch_h, expected_h
+                    ),
+                ));
+            }
+            patch_h
+        }
+        (Some(patch_h), None) => patch_h,
+        (None, Some(expected_h)) => expected_h,
+        (None, None) => {
             return Err(err_root(
-                DiagnosticCode::PatchPageHashMismatch,
+                DiagnosticCode::PatchPageHashMissing,
                 "h",
-                format!(
-                    "patch page hash mismatch (expected '{}', got '{}')",
-                    expected, packet.h
-                ),
+                "patch is missing required page hash binding: include patch.h or provide expected_page_hash".to_string(),
             ));
         }
+    };
+
+    if packet.h != expected {
+        return Err(err_root(
+            DiagnosticCode::PatchPageHashMismatch,
+            "h",
+            format!(
+                "patch page hash mismatch (expected '{}', got '{}')",
+                expected, packet.h
+            ),
+        ));
     }
 
     for (i, op) in patch.ops.iter().enumerate() {
