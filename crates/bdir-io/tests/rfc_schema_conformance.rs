@@ -99,3 +99,22 @@ fn current_wire_types_conform_to_json_schemas() -> Result<()> {
 
     Ok(())
 }
+
+#[test]
+fn edit_packet_ha_is_optional_and_defaults_to_sha256() -> Result<()> {
+    // RFC-0001: if `ha` is omitted, receivers MUST treat it as "sha256".
+    let packet_json: Value = serde_json::json!({
+        "v": 1,
+        "h": "deadbeef",
+        "b": [["p1", 2, "cafebabe", "Hello world"]]
+    });
+
+    // JSON Schema must accept omitted `ha`.
+    assert_valid(edit_packet_schema(), &packet_json);
+
+    // Wire type must default `ha` when deserializing.
+    let packet: EditPacketV1 = serde_json::from_value(packet_json)?;
+    assert_eq!(packet.ha, "sha256");
+
+    Ok(())
+}

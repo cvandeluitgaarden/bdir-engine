@@ -6,7 +6,6 @@
   "required": [
     "v",
     "h",
-    "ha",
     "b"
   ],
   "additionalProperties": false,
@@ -24,6 +23,7 @@
     },
     "ha": {
       "type": "string",
+      "default": "sha256",
       "enum": [
         "xxh64",
         "sha256"

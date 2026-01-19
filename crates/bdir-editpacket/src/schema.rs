@@ -1,5 +1,10 @@
 use serde::{Deserialize, Serialize};
 
+fn default_hash_algorithm() -> String {
+    // RFC-0001 (Edit Packet v1): if `ha` is omitted, receivers MUST treat it as "sha256".
+    "sha256".to_string()
+}
+
 /// Ultra-minimal BDIR Edit Packet v1.
 ///
 /// RFC-0001 wire format:
@@ -19,7 +24,10 @@ pub struct EditPacketV1 {
     pub tid: Option<String>,
     /// Page-level hash
     pub h: String,
-    /// Hash algorithm (required in RFC-0001)
+    /// Hash algorithm identifier for `h` and block-level `text_hash` values.
+    ///
+    /// RFC-0001 defaulting rule: if `ha` is omitted, receivers MUST treat it as "sha256".
+    #[serde(default = "default_hash_algorithm")]
     pub ha: String,
     /// Blocks in reading order
     pub b: Vec<BlockTupleV1>,
