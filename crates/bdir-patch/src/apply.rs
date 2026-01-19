@@ -292,7 +292,7 @@ fn make_insert_id_doc(blocks: &[Block], anchor_id: &str) -> String {
 /// Recompute block text hashes and packet hash `h`.
 ///
 /// Packet hash input is identical to the Document hash payload:
-/// `{blockId}\t{kindCode}\t{textHash}\n` for each block in order.
+/// `{block_id}\t{kind_code}\t{text_hash}\n` for each block in order.
 fn recompute_edit_packet_hashes(packet: &mut EditPacketV1, algo: &str) {
     // Preserve the declared algorithm (and ensure hashes align with it).
     packet.ha = algo.to_string();

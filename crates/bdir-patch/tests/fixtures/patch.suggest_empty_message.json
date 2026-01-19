@@ -3,7 +3,7 @@
   "ops": [
     {
       "op": "suggest",
-      "blockId": "p1",
+      "block_id": "p1",
       "message": "   "
     }
   ]

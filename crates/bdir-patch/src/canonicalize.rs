@@ -16,7 +16,7 @@ use crate::schema::{DeleteOccurrence, OpType, PatchOpV1, PatchV1};
 pub struct CanonicalizeOptions {
     /// When true, operation ordering is derived from Edit Packet block order.
     ///
-    /// If false, ordering falls back to lexicographic `blockId` ordering.
+    /// If false, ordering falls back to lexicographic `block_id` ordering.
     pub prefer_edit_packet_order: bool,
 }
 
@@ -29,7 +29,7 @@ impl Default for CanonicalizeOptions {
 /// Canonicalize patch operation ordering without any document context.
 ///
 /// Ordering:
-/// 1) `blockId` (lexicographic)
+/// 1) `block_id` (lexicographic)
 /// 2) operation type (delete, replace, insert_after, suggest)
 /// 3) operation-specific fields (`before`, `after`, `content`, `message`, `occurrence`)
 /// 4) original index (tie-breaker for deterministic output)

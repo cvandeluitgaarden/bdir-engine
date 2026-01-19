@@ -53,9 +53,14 @@ This engine works with three JSON-adjacent representations:
 
 - **Document JSON** uses **snake_case** field names (e.g. `page_hash`, `hash_algorithm`, `kind_code`).
 - **Edit Packet** and **Patch** follow the RFC wire formats exactly, including their field names
-  (e.g. Edit Packet keys like `v`, `tid`, `h`, `ha`, `b`, and Patch operation field `blockId`).
+  (e.g. Edit Packet keys like `v`, `tid`, `h`, `ha`, `b`, and Patch operation field `block_id`).
+
+Compatibility note: this engine accepts legacy Patch v1 JSON that uses `blockId` for patch operations,
+but serializes `block_id`.
 
 See RFC-0001 "Edit Packet" (Section 6) and "Patch Instructions" (Section 8) for the normative wire formats.
+
+Compatibility note: for Patch v1 operation targeting, this engine **serializes** `block_id` and **also accepts** legacy `blockId` when parsing patches.
 
 ### Required top-level Document fields
 

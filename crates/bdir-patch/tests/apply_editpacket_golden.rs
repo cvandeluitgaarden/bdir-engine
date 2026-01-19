@@ -34,7 +34,7 @@ fn golden_replace_replaces_first_occurrence_only() {
     let patch: PatchV1 = serde_json::from_value(json!({
         "v": 1,
         "ops": [
-            { "op": "replace", "blockId": "p1", "before": "teh first", "after": "the first" }
+            { "op": "replace", "block_id": "p1", "before": "teh first", "after": "the first" }
         ]
     })).unwrap();
 
@@ -54,7 +54,7 @@ fn golden_delete_removes_all_occurrences() {
     let patch: PatchV1 = serde_json::from_value(json!({
         "v": 1,
         "ops": [
-            { "op": "delete", "blockId": "p2", "before": "DELETE_ME", "occurrence": "all" }
+            { "op": "delete", "block_id": "p2", "before": "DELETE_ME", "occurrence": "all" }
         ]
     })).unwrap();
 
@@ -70,7 +70,7 @@ fn golden_delete_removes_first_occurrence_only() {
     let patch: PatchV1 = serde_json::from_value(json!({
         "v": 1,
         "ops": [
-            { "op": "delete", "blockId": "p2", "before": "DELETE_ME", "occurrence": "first" }
+            { "op": "delete", "block_id": "p2", "before": "DELETE_ME", "occurrence": "first" }
         ]
     })).unwrap();
 
@@ -85,7 +85,7 @@ fn golden_insert_after_inserts_new_block_with_deterministic_id_and_inherited_kin
     let patch: PatchV1 = serde_json::from_value(json!({
         "v": 1,
         "ops": [
-            { "op": "insert_after", "blockId": "p1", "content": "Inserted block text." }
+            { "op": "insert_after", "block_id": "p1", "content": "Inserted block text." }
         ]
     })).unwrap();
 
@@ -104,7 +104,7 @@ fn golden_suggest_is_non_mutating() {
     let patch: PatchV1 = serde_json::from_value(json!({
         "v": 1,
         "ops": [
-            { "op": "suggest", "blockId": "p2", "message": "Consider simplifying." }
+            { "op": "suggest", "block_id": "p2", "message": "Consider simplifying." }
         ]
     })).unwrap();
 
@@ -119,7 +119,7 @@ fn reject_unknown_block_id() {
     let patch: PatchV1 = serde_json::from_value(json!({
         "v": 1,
         "ops": [
-            { "op": "replace", "blockId": "nope", "before": "teh first", "after": "the first" }
+            { "op": "replace", "block_id": "nope", "before": "teh first", "after": "the first" }
         ]
     })).unwrap();
 
@@ -134,7 +134,7 @@ fn reject_before_too_short() {
     let patch: PatchV1 = serde_json::from_value(json!({
         "v": 1,
         "ops": [
-            { "op": "replace", "blockId": "p1", "before": "short", "after": "longer" }
+            { "op": "replace", "block_id": "p1", "before": "short", "after": "longer" }
         ]
     })).unwrap();
 

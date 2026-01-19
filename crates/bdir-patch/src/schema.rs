@@ -37,13 +37,14 @@ pub enum DeleteOccurrence {
 /// Patch operation in RFC-0001 v1 wire format.
 ///
 /// Field naming:
-/// - `blockId` in JSON, `block_id` in Rust.
+/// - Canonical JSON field is `block_id` (snake_case).
+/// - For backwards compatibility, `blockId` (camelCase) is accepted on input.
 /// - `content` is used for `insert_after`.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PatchOpV1 {
     pub op: OpType,
 
-    #[serde(rename = "blockId")]
+    #[serde(rename = "block_id", alias = "blockId")]
     pub block_id: String,
 
     #[serde(skip_serializing_if = "Option::is_none")]

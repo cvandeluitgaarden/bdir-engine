@@ -32,7 +32,7 @@ fn conformance_matrix() {
             should_pass: true,
             patch: serde_json::from_value(json!({
                 "v": 1,
-                "ops": [{ "op": "replace", "blockId": "p1", "before": "teh first", "after": "the first" }]
+                "ops": [{ "op": "replace", "block_id": "p1", "before": "teh first", "after": "the first" }]
             })).unwrap(),
         },
         Case {
@@ -40,7 +40,7 @@ fn conformance_matrix() {
             should_pass: false,
             patch: serde_json::from_value(json!({
                 "v": 1,
-                "ops": [{ "op": "replace", "blockId": "nope", "before": "teh first", "after": "the first" }]
+                "ops": [{ "op": "replace", "block_id": "nope", "before": "teh first", "after": "the first" }]
             })).unwrap(),
         },
         Case {
@@ -48,7 +48,7 @@ fn conformance_matrix() {
             should_pass: false,
             patch: serde_json::from_value(json!({
                 "v": 1,
-                "ops": [{ "op": "replace", "blockId": "p1", "before": "short", "after": "the first" }]
+                "ops": [{ "op": "replace", "block_id": "p1", "before": "short", "after": "the first" }]
             })).unwrap(),
         },
     ];

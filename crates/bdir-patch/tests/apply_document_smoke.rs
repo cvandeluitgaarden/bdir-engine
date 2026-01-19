@@ -18,7 +18,7 @@ fn apply_patch_against_document_updates_text_and_hashes() {
     let patch: PatchV1 = serde_json::from_value(json!({
         "v": 1,
         "ops": [
-            {"op": "replace", "blockId": "p1", "before": "teh first", "after": "the first"}
+            {"op": "replace", "block_id": "p1", "before": "teh first", "after": "the first"}
         ]
     }))
     .unwrap();

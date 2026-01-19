@@ -23,7 +23,7 @@ proptest! {
         let packet = packet_with_text(text);
         let patch: PatchV1 = serde_json::from_value(json!({
             "v": 1,
-            "ops": [{ "op": "replace", "blockId": "p1", "before": needle, "after": after }]
+            "ops": [{ "op": "replace", "block_id": "p1", "before": needle, "after": after }]
         })).unwrap();
 
         prop_assert!(apply_patch_against_edit_packet(&packet, &patch).is_err());

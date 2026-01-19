@@ -39,7 +39,7 @@ fn canonicalize_falls_back_to_blockid_and_op_rank() {
         .map(|o| (o.op, o.block_id.clone()))
         .collect();
 
-    // blockId asc, then delete, replace, insert_after, suggest
+    // block_id asc, then delete, replace, insert_after, suggest
     let expect = vec![
         (OpType::Delete, "a".to_string()),
         (OpType::Replace, "a".to_string()),

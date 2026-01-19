@@ -16,13 +16,14 @@
   "definitions": {
     "op": {
       "type": "object",
-      "required": ["op", "blockId"],
+      "required": ["op"],
       "additionalProperties": false,
       "properties": {
         "op": {
           "type": "string",
           "enum": ["replace", "delete", "insert_after", "suggest"]
         },
+        "block_id": { "type": "string", "minLength": 1 },
         "blockId": { "type": "string", "minLength": 1 },
         "before": { "type": "string" },
         "after": { "type": "string" },
@@ -31,6 +32,12 @@
         "message": { "type": "string" }
       },
       "allOf": [
+        {
+          "oneOf": [
+            { "required": ["block_id"], "not": { "required": ["blockId"] } },
+            { "required": ["blockId"], "not": { "required": ["block_id"] } }
+          ]
+        },
         {
           "if": { "properties": { "op": { "const": "replace" } } },
           "then": { "required": ["before", "after"] }
