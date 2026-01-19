@@ -135,6 +135,18 @@ fn suggest_empty_message_fails_with_stable_message() {
 }
 
 #[test]
+fn suggest_with_before_is_rejected() {
+    let doc = load_doc();
+    let patch = load_patch("patch.suggest_with_before.json");
+
+    let err = validate_patch(&doc, &patch).unwrap_err();
+    assert_eq!(
+        err,
+        "ops[0] (suggest) unexpected before (suggest must not include before/after)"
+    );
+}
+
+#[test]
 fn page_hash_mismatch_fails_with_stable_message() {
     let doc = load_doc();
     let patch = load_patch("patch.page_hash_mismatch.json");

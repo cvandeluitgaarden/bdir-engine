@@ -1,0 +1,61 @@
+{
+  "labels": [
+    {"name": "bug", "color": "d73a4a", "description": "Something is not working correctly"},
+    {"name": "spec", "color": "0e8a16", "description": "Spec compliance / interoperability"},
+    {"name": "safety", "color": "b60205", "description": "Safety or validation related issue"},
+    {"name": "determinism", "color": "5319e7", "description": "Affects deterministic behavior"},
+    {"name": "breaking", "color": "fbca04", "description": "May require a breaking change or migration"},
+    {"name": "P0", "color": "b60205", "description": "Highest priority"},
+    {"name": "P1", "color": "d4c5f9", "description": "High priority"}
+  ],
+  "milestones": [
+    {
+      "title": "M2 — Spec Alignment & Interop",
+      "description": "Bring bdir-engine into conformance with RFC-0001 (2026-01-16) and the spec repo schemas; prioritize safety, interoperability, and deterministic behavior."
+    }
+  ],
+  "issues": [
+    {
+      "title": "[Spec] Patch op field name uses blockId but RFC uses block_id",
+      "milestone": "M2 — Spec Alignment & Interop",
+      "labels": ["bug", "spec", "breaking", "P0"],
+      "assignees": [],
+      "body": "## Problem\n\nThe engine's Patch v1 schema and serde mapping use JSON field `blockId` (camelCase), but RFC-0001 (Last Updated: 2026-01-16) specifies `block_id` (snake_case) for patch operations. This breaks interoperability with conforming producers/consumers.\n\n## Why this matters\n\n- Spec-conforming patches will fail to deserialize/validate.\n- Engine-produced patches won't validate against the spec repository's patch schema.\n- This prevents multi-implementation interoperability and makes cross-repo fixtures diverge.\n\n## Proposed direction\n\n- Change wire format to `block_id` for PatchOpV1 (and CLI).\n- Consider temporary dual-accept (accept both `blockId` and `block_id`) behind a compatibility flag, while serializing only `block_id`.\n- Update internal schema files and examples accordingly.\n\n## Acceptance criteria\n\n- [ ] Patch JSON with `block_id` parses and validates.\n- [ ] Engine serializes `block_id` by default.\n- [ ] Backward compatibility strategy documented (if supporting `blockId`).\n- [ ] CLI fixtures/tests updated to new field name."
+    },
+    {
+      "title": "[Safety] Validator allows before/after fields on suggest ops, contrary to RFC",
+      "milestone": "M2 — Spec Alignment & Interop",
+      "labels": ["safety", "spec", "P0"],
+      "assignees": [],
+      "body": "## Problem\n\nRFC-0001 explicitly states that `suggest` operations MUST NOT include `before` or `after` fields, but the engine validator currently only checks that `message` is present (and does not reject `before`/`after`).\n\n## Why this matters\n\n- Ambiguous `suggest` payloads can mask unintended mutations or confuse reviewers.\n- Divergence from the RFC reduces interop and weakens the protocol's intent of separating mutating ops from advisory ones.\n\n## Proposed direction\n\n- Update PatchOpV1 validation to reject `before`, `after`, and `content` when `op == suggest` (and also reject `occurrence`).\n- Add tests that prove invalid suggest ops fail validation with a specific diagnostic code.\n\n## Acceptance criteria\n\n- [ ] `suggest` ops with `before` are rejected.\n- [ ] `suggest` ops with `after` are rejected.\n- [ ] `suggest` ops with `content` are rejected.\n- [ ] Clear structured diagnostics are returned (path + code).\n- [ ] Golden validation tests cover these cases."
+    },
+    {
+      "title": "[Spec] Edit Packet requires ha, but RFC defines defaulting when ha is omitted",
+      "milestone": "M2 — Spec Alignment & Interop",
+      "labels": ["bug", "spec", "breaking", "P0"],
+      "assignees": [],
+      "body": "## Problem\n\nThe engine's Edit Packet v1 schema requires `ha`, while RFC-0001 defines a defaulting rule: if `ha` is omitted, receivers MUST treat it as `\"sha256\"`.\n\n## Why this matters\n\n- Spec-conforming packets that omit `ha` will be rejected.\n- This blocks interoperability and makes it harder to minimize tokens (one of the protocol goals).\n\n## Proposed direction\n\n- Make `ha` optional in the JSON schema and serde model.\n- On parse/validate, default `ha` to `sha256` when missing.\n- Ensure hashing/validation uses the defaulted value consistently and deterministically.\n\n## Acceptance criteria\n\n- [ ] Edit Packet without `ha` parses and validates.\n- [ ] The effective algorithm defaults to `sha256` when omitted.\n- [ ] Determinism tests cover both explicit and omitted `ha` cases.\n- [ ] Schema + examples updated."
+    },
+    {
+      "title": "[Spec] kindCode bounds differ from RFC importance ranges",
+      "milestone": "M2 — Spec Alignment & Interop",
+      "labels": ["spec", "P1"],
+      "assignees": [],
+      "body": "## Problem\n\nThe engine's Edit Packet schema allows kindCode in the range 0–255, but RFC-0001 defines normative importance ranges (0–19, 20–39, 40–59, and 99 for unknown).\n\n## Why this matters\n\n- Interop issues: spec-side validators may reject packets produced by the engine if kindCode is outside allowed ranges.\n- Review guidance becomes unreliable if producers emit arbitrary kindCodes.\n\n## Proposed direction\n\n- Align schema constraints to RFC: allow 0–59 and 99.\n- If the engine wants extra internal kind codes, map them into RFC-compatible ranges at Edit Packet export boundaries.\n\n## Acceptance criteria\n\n- [ ] Edit Packet schema restricts kindCode to 0–59 or 99.\n- [ ] Export path guarantees conformance (with documented mapping if needed).\n- [ ] Tests cover rejection of out-of-range values."
+    },
+    {
+      "title": "[Interop] Patch delete semantics require occurrence; consider defaulting for spec compatibility",
+      "milestone": "M2 — Spec Alignment & Interop",
+      "labels": ["spec", "breaking", "P1"],
+      "assignees": [],
+      "body": "## Problem\n\nThe engine requires `occurrence` for `delete` ops (first/all). RFC-0001's validation requirements mandate `before` for delete, but the RFC does not currently require `occurrence` and the spec repo schema omits it.\n\n## Why this matters\n\n- Spec-conforming delete ops may be rejected by the engine.\n- Implementations disagree on delete semantics (first vs all), which harms determinism when reapplying patches across tools.\n\n## Proposed direction\n\n- Accept delete ops without `occurrence` and default to a deterministic value (recommend: `all` to preserve historical behavior, as indicated in engine comments).\n- Continue allowing explicit `occurrence` for review clarity.\n- Document the defaulting rule and add tests.\n\n## Acceptance criteria\n\n- [ ] `delete` ops without `occurrence` validate successfully and behave deterministically.\n- [ ] Defaulting rule is documented in crate docs and CLI help.\n- [ ] Golden apply tests cover both explicit and defaulted cases."
+    },
+    {
+      "title": "[Safety] Patch application should require explicit page-hash binding or external expected hash",
+      "milestone": "M2 — Spec Alignment & Interop",
+      "labels": ["safety", "determinism", "P0"],
+      "assignees": [],
+      "body": "## Problem\n\nRFC-0001 states that a patch MUST only be applied when the page-level content hash matches. In the engine, patch page-hash binding is optional (`h`), so patches without `h` can be applied as long as block-level `before` checks pass.\n\n## Why this matters\n\n- Allows patches to apply to a different page version where the `before` substring still matches, undermining intent binding.\n- Weakens deterministic replay and audit properties.\n\n## Proposed direction\n\n- Provide a strict apply/validate mode that requires binding:\n  - either require patch.h to be present and match, OR\n  - require callers to pass an `expected_page_hash` (from the authoritative Document/Edit Packet) and reject if patch lacks a matching binding.\n- Expose clear diagnostics for mismatch/missing binding.\n\n## Acceptance criteria\n\n- [ ] Strict mode exists and is easy to enable in CLI and library API.\n- [ ] In strict mode, patches without binding are rejected.\n- [ ] In strict mode, hash mismatches fail fast with a clear diagnostic.\n- [ ] Default behavior is documented (strict vs permissive)."
+    }
+  ]
+}

@@ -48,11 +48,31 @@
         },
         {
           "if": { "properties": { "op": { "const": "insert_after" } } },
-          "then": { "required": ["content"] }
+          "then": {
+            "required": ["content"],
+            "not": {
+              "anyOf": [
+                { "required": ["before"] },
+                { "required": ["after"] },
+                { "required": ["message"] },
+                { "required": ["occurrence"] }
+              ]
+            }
+          }
         },
         {
           "if": { "properties": { "op": { "const": "suggest" } } },
-          "then": { "required": ["message"] }
+          "then": {
+            "required": ["message"],
+            "not": {
+              "anyOf": [
+                { "required": ["before"] },
+                { "required": ["after"] },
+                { "required": ["content"] },
+                { "required": ["occurrence"] }
+              ]
+            }
+          }
         }
       ]
     }

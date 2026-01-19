@@ -293,6 +293,42 @@ pub fn validate_patch_with_diagnostics(
                         ),
                     ));
                 }
+                if op.before.is_some() {
+                    return Err(err_op(
+                        DiagnosticCode::UnexpectedField,
+                        i,
+                        op.op,
+                        Some(op.block_id.clone()),
+                        Some(format!("ops[{i}].before")),
+                        format!(
+                            "ops[{i}] (insert_after) unexpected before (insert_after must not include before/after)"
+                        ),
+                    ));
+                }
+                if op.after.is_some() {
+                    return Err(err_op(
+                        DiagnosticCode::UnexpectedField,
+                        i,
+                        op.op,
+                        Some(op.block_id.clone()),
+                        Some(format!("ops[{i}].after")),
+                        format!(
+                            "ops[{i}] (insert_after) unexpected after (insert_after must not include before/after)"
+                        ),
+                    ));
+                }
+                if op.message.is_some() {
+                    return Err(err_op(
+                        DiagnosticCode::UnexpectedField,
+                        i,
+                        op.op,
+                        Some(op.block_id.clone()),
+                        Some(format!("ops[{i}].message")),
+                        format!(
+                            "ops[{i}] (insert_after) unexpected message (insert_after is mutating; use suggest instead)"
+                        ),
+                    ));
+                }
                 let content = op.content.as_deref().ok_or_else(|| {
                     err_op(
                         DiagnosticCode::MissingField,
@@ -325,6 +361,42 @@ pub fn validate_patch_with_diagnostics(
                         Some(format!("ops[{i}].occurrence")),
                         format!(
                             "ops[{i}] (suggest) unexpected occurrence (only valid for delete)"
+                        ),
+                    ));
+                }
+                if op.before.is_some() {
+                    return Err(err_op(
+                        DiagnosticCode::UnexpectedField,
+                        i,
+                        op.op,
+                        Some(op.block_id.clone()),
+                        Some(format!("ops[{i}].before")),
+                        format!(
+                            "ops[{i}] (suggest) unexpected before (suggest must not include before/after)"
+                        ),
+                    ));
+                }
+                if op.after.is_some() {
+                    return Err(err_op(
+                        DiagnosticCode::UnexpectedField,
+                        i,
+                        op.op,
+                        Some(op.block_id.clone()),
+                        Some(format!("ops[{i}].after")),
+                        format!(
+                            "ops[{i}] (suggest) unexpected after (suggest must not include before/after)"
+                        ),
+                    ));
+                }
+                if op.content.is_some() {
+                    return Err(err_op(
+                        DiagnosticCode::UnexpectedField,
+                        i,
+                        op.op,
+                        Some(op.block_id.clone()),
+                        Some(format!("ops[{i}].content")),
+                        format!(
+                            "ops[{i}] (suggest) unexpected content (suggest is non-mutating; use insert_after instead)"
                         ),
                     ));
                 }
@@ -560,6 +632,42 @@ pub fn validate_patch_against_edit_packet_with_diagnostics(
                         ),
                     ));
                 }
+                if op.before.is_some() {
+                    return Err(err_op(
+                        DiagnosticCode::UnexpectedField,
+                        i,
+                        op.op,
+                        Some(op.block_id.clone()),
+                        Some(format!("ops[{i}].before")),
+                        format!(
+                            "ops[{i}] (insert_after) unexpected before (insert_after must not include before/after)"
+                        ),
+                    ));
+                }
+                if op.after.is_some() {
+                    return Err(err_op(
+                        DiagnosticCode::UnexpectedField,
+                        i,
+                        op.op,
+                        Some(op.block_id.clone()),
+                        Some(format!("ops[{i}].after")),
+                        format!(
+                            "ops[{i}] (insert_after) unexpected after (insert_after must not include before/after)"
+                        ),
+                    ));
+                }
+                if op.message.is_some() {
+                    return Err(err_op(
+                        DiagnosticCode::UnexpectedField,
+                        i,
+                        op.op,
+                        Some(op.block_id.clone()),
+                        Some(format!("ops[{i}].message")),
+                        format!(
+                            "ops[{i}] (insert_after) unexpected message (insert_after is mutating; use suggest instead)"
+                        ),
+                    ));
+                }
                 let content = op.content.as_deref().ok_or_else(|| {
                     err_op(
                         DiagnosticCode::MissingField,
@@ -592,6 +700,42 @@ pub fn validate_patch_against_edit_packet_with_diagnostics(
                         Some(format!("ops[{i}].occurrence")),
                         format!(
                             "ops[{i}] (suggest) unexpected occurrence (only valid for delete)"
+                        ),
+                    ));
+                }
+                if op.before.is_some() {
+                    return Err(err_op(
+                        DiagnosticCode::UnexpectedField,
+                        i,
+                        op.op,
+                        Some(op.block_id.clone()),
+                        Some(format!("ops[{i}].before")),
+                        format!(
+                            "ops[{i}] (suggest) unexpected before (suggest must not include before/after)"
+                        ),
+                    ));
+                }
+                if op.after.is_some() {
+                    return Err(err_op(
+                        DiagnosticCode::UnexpectedField,
+                        i,
+                        op.op,
+                        Some(op.block_id.clone()),
+                        Some(format!("ops[{i}].after")),
+                        format!(
+                            "ops[{i}] (suggest) unexpected after (suggest must not include before/after)"
+                        ),
+                    ));
+                }
+                if op.content.is_some() {
+                    return Err(err_op(
+                        DiagnosticCode::UnexpectedField,
+                        i,
+                        op.op,
+                        Some(op.block_id.clone()),
+                        Some(format!("ops[{i}].content")),
+                        format!(
+                            "ops[{i}] (suggest) unexpected content (suggest is non-mutating; use insert_after instead)"
                         ),
                     ));
                 }
