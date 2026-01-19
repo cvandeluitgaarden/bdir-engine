@@ -42,8 +42,15 @@
           },
           {
             "type": "integer",
-            "minimum": 0,
-            "maximum": 255
+            "anyOf": [
+              {
+                "minimum": 0,
+                "maximum": 59
+              },
+              {
+                "const": 99
+              }
+            ]
           },
           {
             "type": "string",

@@ -1,4 +1,5 @@
 use bdir_core::model::Document;
+use bdir_codebook as codebook;
 
 use crate::{
     EditPacketV1, PatchTelemetry, diagnostics::{DiagnosticCode, ValidationDiagnostic, ValidationError}, schema::{DeleteOccurrence, OpType, PatchV1}
@@ -509,7 +510,12 @@ pub fn validate_patch_against_edit_packet_with_diagnostics(
     }
 
     for (i, op) in patch.ops.iter().enumerate() {
-        let block = packet.b.iter().find(|t| t.0 == op.block_id).ok_or_else(|| {
+        let (block_idx, block) = packet
+            .b
+            .iter()
+            .enumerate()
+            .find(|(_, t)| t.0 == op.block_id)
+            .ok_or_else(|| {
             err_op(
                 DiagnosticCode::UnknownBlockId,
                 i,
@@ -519,6 +525,22 @@ pub fn validate_patch_against_edit_packet_with_diagnostics(
                 format!("ops[{i}] references unknown block_id '{}'", op.block_id),
             )
         })?;
+
+        // RFC-0001 kind_code semantics define canonical v1 importance ranges.
+        // If the edit packet contains a non-canonical kind_code, reject early.
+        if !codebook::is_valid_v1(block.1) {
+            return Err(err_op(
+                DiagnosticCode::KindCodeOutOfRange,
+                i,
+                op.op,
+                Some(op.block_id.clone()),
+                Some(format!("b[{block_idx}][1]")),
+                format!(
+                    "edit packet block '{}' has non-canonical kind_code {} (expected 0-59 or 99)",
+                    op.block_id, block.1
+                ),
+            ));
+        }
 
         // Optional strict safety gate: enforce kindCode policy.
         // tuple layout: (id, kind, text_hash, text)

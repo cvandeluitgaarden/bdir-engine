@@ -71,3 +71,21 @@ pub fn is_ui_chrome(kind_code: u16) -> bool {
 pub fn is_unknown(kind_code: u16) -> bool {
     matches!(importance(kind_code), KindImportance::Unknown)
 }
+
+/// Returns true if `kind_code` is within the RFC-0001 v1 importance ranges.
+///
+/// RFC-0001 defines the following canonical ranges:
+/// - 0–19: core content or structure
+/// - 20–39: boilerplate or navigation
+/// - 40–59: UI chrome
+/// - 99: unknown
+///
+/// Values outside these ranges are considered non-canonical for v1 and SHOULD
+/// be rejected by strict validators.
+pub fn is_valid_v1(kind_code: u16) -> bool {
+    use ranges::*;
+    matches!(
+        kind_code,
+        CORE_START..=UI_CHROME_END | UNKNOWN
+    )
+}
