@@ -18,6 +18,8 @@ pub enum DiagnosticCode {
     BeforeEmpty,
     BeforeTooShort,
     BeforeNotFound,
+    /// The `before` substring matched more than once and the op did not disambiguate.
+    BeforeAmbiguous,
     /// The target block's kindCode is not allowed under strict kindCode policy enforcement.
     KindCodeDisallowed,
     /// The edit packet's kindCode is outside RFC-0001 v1 canonical importance ranges.

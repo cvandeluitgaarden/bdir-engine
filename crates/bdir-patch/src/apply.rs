@@ -10,6 +10,22 @@ use bdir_core::hash::{hash_canon_hex, hash_hex};
 use bdir_core::model::{Block, Document};
 use bdir_editpacket::{BlockTupleV1, EditPacketV1};
 
+fn count_non_overlapping(haystack: &str, needle: &str) -> usize {
+    if needle.is_empty() {
+        return 0;
+    }
+    let mut count = 0usize;
+    let mut start = 0usize;
+    while let Some(pos) = haystack[start..].find(needle) {
+        count += 1;
+        start += pos + needle.len();
+        if start >= haystack.len() {
+            break;
+        }
+    }
+    count
+}
+
 /// Apply a patch against an Edit Packet and return an updated Edit Packet.
 ///
 /// Deterministic semantics:
@@ -74,17 +90,22 @@ pub fn apply_patch_against_edit_packet_with_options(
                     .as_deref()
                     .ok_or_else(|| "ops delete missing before (should be validated)".to_string())?;
 
-                let occ = op
-                    .occurrence
-                    .ok_or_else(|| "ops delete missing occurrence (should be validated)".to_string())?;
-
                 let idx = find_block_index(&out.b, &op.block_id)
                     .ok_or_else(|| format!("unknown block_id '{}'", op.block_id))?;
 
                 let current_text = out.b[idx].3.clone();
-                out.b[idx].3 = match occ {
-                    DeleteOccurrence::First => delete_first(&current_text, before),
-                    DeleteOccurrence::All => current_text.replace(before, ""),
+                out.b[idx].3 = match op.occurrence {
+                    None => {
+                        let n = count_non_overlapping(&current_text, before);
+                        if n != 1 {
+                            return Err(format!(
+                                "ops delete before substring is ambiguous (matches {n} times); specify occurrence"
+                            ));
+                        }
+                        delete_first(&current_text, before)
+                    }
+                    Some(DeleteOccurrence::First) => delete_first(&current_text, before),
+                    Some(DeleteOccurrence::All) => current_text.replace(before, ""),
                 };
             }
 
@@ -162,17 +183,22 @@ pub fn apply_patch_against_document(doc: &Document, patch: &PatchV1) -> Result<D
                     .as_deref()
                     .ok_or_else(|| "ops delete missing before (should be validated)".to_string())?;
 
-                let occ = op
-                    .occurrence
-                    .ok_or_else(|| "ops delete missing occurrence (should be validated)".to_string())?;
-
                 let idx = find_doc_block_index(&out.blocks, &op.block_id)
                     .ok_or_else(|| format!("unknown block_id '{}'", op.block_id))?;
 
                 let current_text = out.blocks[idx].text.clone();
-                out.blocks[idx].text = match occ {
-                    DeleteOccurrence::First => delete_first(&current_text, before),
-                    DeleteOccurrence::All => current_text.replace(before, ""),
+                out.blocks[idx].text = match op.occurrence {
+                    None => {
+                        let n = count_non_overlapping(&current_text, before);
+                        if n != 1 {
+                            return Err(format!(
+                                "ops delete before substring is ambiguous (matches {n} times); specify occurrence"
+                            ));
+                        }
+                        delete_first(&current_text, before)
+                    }
+                    Some(DeleteOccurrence::First) => delete_first(&current_text, before),
+                    Some(DeleteOccurrence::All) => current_text.replace(before, ""),
                 };
             }
 

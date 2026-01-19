@@ -44,7 +44,7 @@
         },
         {
           "if": { "properties": { "op": { "const": "delete" } } },
-          "then": { "required": ["before", "occurrence"] }
+          "then": { "required": ["before"] }
         },
         {
           "if": { "properties": { "op": { "const": "insert_after" } } },

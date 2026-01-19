@@ -53,7 +53,11 @@ pub struct PatchOpV1 {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub after: Option<String>,
 
-    /// Delete occurrence semantics (required for `delete`).
+    /// Delete occurrence semantics.
+    ///
+    /// If omitted, validators SHOULD treat the delete as targeting a single,
+    /// unambiguous match of `before` (i.e. the `before` substring MUST occur
+    /// exactly once within the target block).
     ///
     /// JSON field name: `occurrence`.
     #[serde(skip_serializing_if = "Option::is_none")]
