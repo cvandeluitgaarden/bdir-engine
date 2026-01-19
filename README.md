@@ -41,6 +41,56 @@ The BDIR Patch Protocol constrains AI systems to propose **patch instructions** 
 
 ---
 
+## JSON formats and casing
+
+This engine works with three JSON-adjacent representations:
+
+- **Document JSON (engine input/output)**: a verbose, stable format used by the CLI and libraries in this repo.
+- **Edit Packet (AI input)**: the compact wire format defined by RFC-0001.
+- **Patch (AI output)**: the patch wire format defined by RFC-0001.
+
+### Canonical casing
+
+- **Document JSON** uses **snake_case** field names (e.g. `page_hash`, `hash_algorithm`, `kind_code`).
+- **Edit Packet** and **Patch** follow the RFC wire formats exactly, including their field names
+  (e.g. Edit Packet keys like `v`, `tid`, `h`, `ha`, `b`, and Patch operation field `blockId`).
+
+See RFC-0001 "Edit Packet" (Section 6) and "Patch Instructions" (Section 8) for the normative wire formats.
+
+### Required top-level Document fields
+
+When providing **Document JSON** to the engine, the following top-level fields are required:
+
+- `hash_algorithm` *(string)*
+- `blocks` *(array)*
+
+The following top-level field is optional (it can be computed):
+
+- `page_hash` *(string, optional)*
+
+For each `blocks[]` entry:
+
+- Required: `id` *(string)*, `kind_code` *(number)*, `text` *(string)*
+- Optional: `text_hash` *(string, optional — can be computed)*
+
+Minimal example:
+
+```json
+{
+  "hash_algorithm": "xxh64",
+  "blocks": [
+    {
+      "id": "p1",
+      "kind_code": 2,
+      "text": "This is a paragraph."
+    }
+  ]
+}
+```
+
+Note: when `text_hash` and/or `page_hash` are missing or empty, tools in this repo may recompute them deterministically.
+
+
 ## Components
 
 This workspace is split into small crates:
