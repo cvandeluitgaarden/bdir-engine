@@ -86,7 +86,7 @@ fn canonicalize_ops_inner(ops: &mut Vec<PatchOpV1>, order: Option<&HashMap<&str,
                     after: op.after.clone().unwrap_or_default(),
                     content: op.content.clone().unwrap_or_default(),
                     message: op.message.clone().unwrap_or_default(),
-                    occurrence_rank: op.occurrence.map(occurrence_rank).unwrap_or(0),
+                    occurrence_rank: op.occurrence.map(occurrence_rank).unwrap_or(occurrence_rank(DeleteOccurrence::All)),
                 },
             )
         })

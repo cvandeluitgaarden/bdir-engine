@@ -6,10 +6,17 @@
 //! That may be fine, but it MUST be intentional and reviewed, because it
 //! affects caching, diff/review noise, and any hashing/signing schemes.
 
-use bdir_patch::{canonicalize_patch_ops};
+use bdir_patch::canonicalize_patch_ops;
 use bdir_patch::schema::PatchV1;
 
 mod util;
+
+fn normalize_for_golden(s: &str) -> String {
+    // Make comparison platform-independent:
+    // - Normalize Windows CRLF to LF
+    // - Trim trailing whitespace/newlines
+    s.replace("\r\n", "\n").trim().to_string()
+}
 
 #[test]
 fn golden_canonicalize_patch_ops_order_is_stable() {
@@ -21,6 +28,5 @@ fn golden_canonicalize_patch_ops_order_is_stable() {
 
     let got = serde_json::to_string_pretty(&patch).unwrap();
 
-    // normalize trailing whitespace/newlines for a stable comparison
-    assert_eq!(got.trim(), expected_json.trim());
+    assert_eq!(normalize_for_golden(&got), normalize_for_golden(&expected_json));
 }

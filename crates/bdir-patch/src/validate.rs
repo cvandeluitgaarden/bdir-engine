@@ -5,22 +5,6 @@ use crate::{
     EditPacketV1, PatchTelemetry, diagnostics::{DiagnosticCode, ValidationDiagnostic, ValidationError}, schema::{DeleteOccurrence, OpType, PatchV1}
 };
 
-fn count_non_overlapping(haystack: &str, needle: &str) -> usize {
-    if needle.is_empty() {
-        return 0;
-    }
-    let mut count = 0usize;
-    let mut start = 0usize;
-    while let Some(pos) = haystack[start..].find(needle) {
-        count += 1;
-        start += pos + needle.len();
-        if start >= haystack.len() {
-            break;
-        }
-    }
-    count
-}
-
 /// kindCode enforcement policy.
 ///
 /// When strict mode is enabled, patch validation rejects any op that targets a block
@@ -265,6 +249,13 @@ pub fn validate_patch_with_diagnostics(
                         format!("ops[{i}] (delete) missing before"),
                     )
                 })?;
+
+                let occ = op.occurrence.unwrap_or(DeleteOccurrence::All);
+
+                let _ = match occ {
+                    DeleteOccurrence::First | DeleteOccurrence::All => occ,
+                };
+
                 guard_before_diag(i, op.op, &op.block_id, before, opts.min_before_len)?;
                 if !block.text.contains(before) {
                     return Err(err_op(
@@ -278,34 +269,6 @@ pub fn validate_patch_with_diagnostics(
                             op.block_id
                         ),
                     ));
-                }
-
-                let match_count = count_non_overlapping(&block.text, before);
-
-                match op.occurrence {
-                    // Spec-aligned: if `occurrence` is omitted, the `before` substring MUST
-                    // be unambiguous (i.e. occur exactly once).
-                    None => {
-                        if match_count != 1 {
-                            return Err(err_op(
-                                DiagnosticCode::BeforeAmbiguous,
-                                i,
-                                op.op,
-                                Some(op.block_id.clone()),
-                                Some(format!("ops[{i}].before")),
-                                format!(
-                                    "ops[{i}] (delete) before substring is ambiguous (matches {match_count} times); specify occurrence",
-                                ),
-                            ));
-                        }
-                    }
-                    // Engine extension: explicit delete semantics.
-                    Some(DeleteOccurrence::First) => {
-                        // Always deterministic; validated via presence of `before` above.
-                    }
-                    Some(DeleteOccurrence::All) => {
-                        // Always deterministic; validated via presence of `before` above.
-                    }
                 }
             }
 
@@ -637,6 +600,13 @@ pub fn validate_patch_against_edit_packet_with_diagnostics(
                         format!("ops[{i}] (delete) missing before"),
                     )
                 })?;
+
+                let occ = op.occurrence.unwrap_or(DeleteOccurrence::All);
+
+                let _ = match occ {
+                    DeleteOccurrence::First | DeleteOccurrence::All => occ,
+                };
+
                 guard_before_diag(i, op.op, &op.block_id, before, opts.min_before_len)?;
                 if !block_text.contains(before) {
                     return Err(err_op(
@@ -650,27 +620,6 @@ pub fn validate_patch_against_edit_packet_with_diagnostics(
                             op.block_id
                         ),
                     ));
-                }
-
-                let match_count = count_non_overlapping(block_text, before);
-
-                match op.occurrence {
-                    None => {
-                        if match_count != 1 {
-                            return Err(err_op(
-                                DiagnosticCode::BeforeAmbiguous,
-                                i,
-                                op.op,
-                                Some(op.block_id.clone()),
-                                Some(format!("ops[{i}].before")),
-                                format!(
-                                    "ops[{i}] (delete) before substring is ambiguous (matches {match_count} times); specify occurrence",
-                                ),
-                            ));
-                        }
-                    }
-                    Some(DeleteOccurrence::First) => {}
-                    Some(DeleteOccurrence::All) => {}
                 }
             }
 

@@ -55,33 +55,13 @@ fn before_not_found_fails_with_stable_message() {
 }
 
 #[test]
-fn delete_missing_occurrence_is_allowed_when_unambiguous() {
+fn delete_missing_occurrence_defaults_to_all_for_compat() {
     let doc = load_doc();
     let patch = load_patch("patch.delete_missing_occurrence.json");
 
-    validate_patch(&doc, &patch).expect("delete without occurrence should be accepted when unambiguous");
-}
-
-#[test]
-fn delete_missing_occurrence_is_rejected_when_ambiguous() {
-    let doc = load_doc();
-    let patch = load_patch("patch.delete_missing_occurrence_ambiguous.json");
-
-    // This fixture intentionally uses a short and repeated substring.
-    // Lower the guard to focus the test on ambiguity semantics.
-    let err = validate_patch_with_options(
-        &doc,
-        &patch,
-        ValidateOptions {
-            min_before_len: 1,
-            ..ValidateOptions::default()
-        },
-    )
-    .unwrap_err();
-    assert_eq!(
-        err,
-        "ops[0] (delete) before substring is ambiguous (matches 2 times); specify occurrence"
-    );
+    // Interop: for v1 compatibility, occurrence is optional for delete.
+    // When omitted, consumers should treat it as "all".
+    validate_patch(&doc, &patch).expect("missing occurrence should be accepted");
 }
 
 #[test]
