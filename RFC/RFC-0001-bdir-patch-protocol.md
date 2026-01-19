@@ -18,6 +18,12 @@ This document specifies the **BDIR Patch Protocol**, a stateless protocol for AI
 
 This document is not an Internet Standards Track specification; it is published for informational purposes. Distribution of this memo is unlimited.
 
+> **Non-normative note**
+>
+> This document defines protocol requirements.
+> Current implementation status is tracked separately in
+> `docs/implementation-status.md`.
+
 ---
 
 ## Copyright Notice

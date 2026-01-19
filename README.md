@@ -18,6 +18,17 @@ This repository implements the protocol defined in the `bdir-spec` repository.
 
 ---
 
+## Implementation status
+
+The normative definition of the protocol is specified in **RFC-0001**.
+
+For current engine support, known gaps, and planned work, see:
+
+- `docs/implementation-status.md`
+
+---
+
+
 ## What is BDIR?
 
 BDIR (Block-based Document Intermediate Representation) represents a document as an ordered list of semantic blocks, each with:
