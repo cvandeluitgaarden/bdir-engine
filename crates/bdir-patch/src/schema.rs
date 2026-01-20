@@ -3,12 +3,23 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PatchV1 {
     pub v: u8,
+
     /// Optional page-level hash binding.
     ///
     /// When present, validators MUST reject the patch if the target document/edit-packet
     /// page hash does not exactly match this value.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub h: Option<String>,
+
+    /// Hash algorithm identifier for `h`.
+    ///
+    /// RFC-0001 v1.0.2: if omitted, receivers MUST treat this as "sha256".
+    ///
+    /// Note: this crate validates `ha` against the target document's declared
+    /// `hash_algorithm` to prevent mismatched bindings.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub ha: Option<String>,
+
     pub ops: Vec<PatchOpV1>,
 }
 
@@ -56,7 +67,16 @@ pub enum Occurrence {
 /// Field naming:
 /// - Canonical JSON field is `block_id` (snake_case).
 /// - For backwards compatibility, `blockId` (camelCase) is accepted on input.
-/// - `content` is used for `insert_after`.
+///
+/// `insert_after` (RFC-0001 v1.0.2) fields:
+/// - `new_block_id` (REQUIRED)
+/// - `kind_code` (REQUIRED)
+/// - `text` (REQUIRED)
+///
+/// Backwards compatibility:
+/// - Older engine versions used `content` instead of `text` and auto-derived
+///   `new_block_id`/`kind_code`. Those spellings are accepted on input but are
+///   rejected by validation unless the required RFC fields are present.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PatchOpV1 {
     pub op: OpType,
@@ -76,9 +96,25 @@ pub struct PatchOpV1 {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub occurrence: Option<Occurrence>,
 
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub content: Option<String>,
+    /// `insert_after` only: identifier for the inserted block.
+    #[serde(skip_serializing_if = "Option::is_none", rename = "new_block_id", alias = "newBlockId")]
+    pub new_block_id: Option<String>,
 
+    /// `insert_after` only: kind classification for the inserted block.
+    #[serde(skip_serializing_if = "Option::is_none", rename = "kind_code", alias = "kindCode")]
+    pub kind_code: Option<u16>,
+
+    /// `insert_after` only: canonical text for the inserted block.
+    ///
+    /// Backwards compatibility: accepts legacy `content` field as an alias.
+    #[serde(skip_serializing_if = "Option::is_none", alias = "content")]
+    pub text: Option<String>,
+
+    /// `suggest` only: advisory message.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub message: Option<String>,
+
+    /// `suggest` only: optional severity.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub severity: Option<String>,
 }

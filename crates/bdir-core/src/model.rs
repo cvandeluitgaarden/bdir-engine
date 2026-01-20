@@ -26,20 +26,38 @@ pub struct Document {
 }
 
 impl Document {
+    /// Normalize and validate the document's declared `hash_algorithm`.
+    ///
+    /// Normalization:
+    /// - Trims surrounding whitespace
+    /// - Lowercases for canonical representation
+    ///
+    /// Validation:
+    /// - Returns an error if the algorithm is empty or unsupported.
+    ///
+    /// RFC-0001 (v1.0.2) requires receivers to reject unrecognized
+    /// `hash_algorithm` values rather than coercing them.
+    pub fn normalize_hash_algorithm(&mut self) -> Result<(), String> {
+        // NOTE: We must avoid holding a `&str` borrow into `self.hash_algorithm` across assignment.
+        let algo = self.hash_algorithm.trim().to_lowercase();
+        if algo.is_empty() {
+            return Err("hash_algorithm is empty".to_string());
+        }
+        if hash_hex(&algo, "").is_none() {
+            return Err(format!("unsupported hash_algorithm '{algo}'"));
+        }
+        self.hash_algorithm = algo;
+        Ok(())
+    }
+
     /// Recompute block `text_hash` values (from block text) and `page_hash`
     /// deterministically.
     ///
-    /// Page hash is computed over ordered lines:
-    /// `{blockId}\t{kindCode}\t{textHash}\n`
-    pub fn recompute_hashes(&mut self) {
-        // Respect the document's declared algorithm. Default to xxh64 if empty/unknown.
-        // NOTE: We must avoid holding a `&str` borrow into `self.hash_algorithm` across assignment.
-        let mut algo = self.hash_algorithm.trim().to_lowercase();
-        if algo.is_empty() || hash_hex(&algo, "").is_none() {
-            algo = "xxh64".to_string();
-        }
-        self.hash_algorithm = algo.clone();
+    /// Returns an error if the document's `hash_algorithm` is unsupported.
+    pub fn try_recompute_hashes(&mut self) -> Result<(), String> {
+        self.normalize_hash_algorithm()?;
 
+        let algo = self.hash_algorithm.clone();
         for b in &mut self.blocks {
             b.text_hash = hash_canon_hex(&algo, &b.text).expect("supported algorithm");
         }
@@ -55,5 +73,15 @@ impl Document {
         }
 
         self.page_hash = hash_hex(&algo, &page_payload).expect("supported algorithm");
+        Ok(())
+    }
+
+    /// Convenience wrapper that panics on unsupported algorithms.
+    ///
+    /// This preserves the existing API shape for internal callers/tests that
+    /// assume a valid algorithm, while keeping RFC behavior available via
+    /// `try_recompute_hashes()`.
+    pub fn recompute_hashes(&mut self) {
+        self.try_recompute_hashes().expect("supported hash_algorithm");
     }
 }

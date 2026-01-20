@@ -98,13 +98,13 @@ fn golden_delete_without_occurrence_is_rejected_when_ambiguous() {
 }
 
 #[test]
-fn golden_insert_after_inserts_new_block_with_deterministic_id_and_inherited_kind() {
+fn golden_insert_after_inserts_new_block_with_explicit_id_and_kind_code() {
     let packet = baseline_packet();
 
     let patch: PatchV1 = serde_json::from_value(json!({
         "v": 1,
         "ops": [
-            { "op": "insert_after", "block_id": "p1", "content": "Inserted block text." }
+            { "op": "insert_after", "block_id": "p1", "new_block_id": "p1_ins", "kind_code": 2, "text": "Inserted block text." }
         ]
     })).unwrap();
 
@@ -113,7 +113,7 @@ fn golden_insert_after_inserts_new_block_with_deterministic_id_and_inherited_kin
 
     // Inserted immediately after p1
     assert_eq!(out.b[1].0, "p1_ins");
-    assert_eq!(out.b[1].1, out.b[0].1); // inherits kindCode
+    assert_eq!(out.b[1].1, 2); // kind_code as provided
     assert_eq!(out.b[1].3, "Inserted block text.");
 }
 
@@ -167,5 +167,6 @@ fn reject_before_too_short() {
 
 fn bind_patch_to_edit_packet(mut patch: PatchV1, ep: &EditPacketV1) -> PatchV1 {
     patch.h = Some(ep.h.clone());
+    patch.ha = Some(ep.ha.clone());
     patch
 }

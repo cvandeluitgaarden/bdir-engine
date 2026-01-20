@@ -8,6 +8,7 @@
 use std::fmt;
 
 use bdir_core::model::Document;
+use bdir_core::hash::hash_hex;
 use serde::de::Error as _;
 use serde_json::Value;
 
@@ -25,6 +26,9 @@ pub enum DocumentJsonError {
     },
     /// JSON was valid, but did not match the Document schema/shape.
     InvalidDocumentShape(serde_json::Error),
+
+    /// Document JSON was valid, but declared an unsupported `hash_algorithm`.
+    UnsupportedHashAlgorithm(String),
 }
 
 impl fmt::Display for DocumentJsonError {
@@ -50,6 +54,13 @@ impl fmt::Display for DocumentJsonError {
                     REQUIRED_TOP_LEVEL_FIELDS.join(", ")
                 )
             }
+
+            DocumentJsonError::UnsupportedHashAlgorithm(algo) => {
+                write!(
+                    f,
+                    "Unsupported hash_algorithm '{algo}'. Supported algorithms: sha256, xxh64."
+                )
+            }
         }
     }
 }
@@ -60,6 +71,7 @@ impl std::error::Error for DocumentJsonError {
             DocumentJsonError::InvalidJson(e) => Some(e),
             DocumentJsonError::InvalidDocumentShape(e) => Some(e),
             DocumentJsonError::MissingRequiredTopLevelFields { .. } => None,
+            DocumentJsonError::UnsupportedHashAlgorithm(_) => None,
         }
     }
 }
@@ -89,5 +101,14 @@ pub fn parse_document_json_str(s: &str) -> Result<Document, DocumentJsonError> {
         });
     }
 
-    serde_json::from_value(v).map_err(DocumentJsonError::InvalidDocumentShape)
+    let mut doc: Document = serde_json::from_value(v).map_err(DocumentJsonError::InvalidDocumentShape)?;
+
+    // RFC-0001: receivers MUST reject unrecognized hash algorithms.
+    let algo = doc.hash_algorithm.trim().to_lowercase();
+    if algo.is_empty() || hash_hex(&algo, "").is_none() {
+        return Err(DocumentJsonError::UnsupportedHashAlgorithm(doc.hash_algorithm));
+    }
+    doc.hash_algorithm = algo;
+
+    Ok(doc)
 }

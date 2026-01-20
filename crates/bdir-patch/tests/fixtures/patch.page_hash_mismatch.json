@@ -1,6 +1,7 @@
 {
   "v": 1,
   "h": "__MISMATCH__",
+  "ha": "xxh64",
   "ops": [
     {
       "op": "suggest",

@@ -4,6 +4,6 @@
     { "op": "suggest", "block_id": "p2", "message": "Consider simplifying." },
     { "op": "replace", "block_id": "p1", "before": "teh first", "after": "the first" },
     { "op": "delete", "block_id": "p1", "before": "DELETE_ME", "occurrence": "all" },
-    { "op": "insert_after", "block_id": "p1", "content": "Inserted block text." }
+    { "op": "insert_after", "block_id": "p1", "new_block_id": "p1_ins", "kind_code": 2, "text": "Inserted block text." }
   ]
 }

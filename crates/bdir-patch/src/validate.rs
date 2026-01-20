@@ -1,5 +1,4 @@
 use bdir_core::model::Document;
-use bdir_codebook as codebook;
 
 use crate::{
     EditPacketV1,
@@ -194,6 +193,39 @@ pub fn validate_patch_with_diagnostics(
             ));
         }
     };
+
+    // Hash algorithm binding (RFC-0001 v1.0.2):
+    // - patch.ha identifies the algorithm used for patch.h
+    // - patch.ha MAY be omitted for interoperability (algorithm is implied by the target document/packet)
+    // - if patch.ha is present, receivers MUST reject when it does not match the target hash algorithm
+    //
+    // Note: this check only applies when the patch includes an in-band page-hash binding (`h`).
+    // If the caller supplies `expected_page_hash` out-of-band, the hash algorithm is implied by
+    // the target document/packet and `patch.ha` is ignored.
+    if patch.h.is_some() {
+        if let Some(patch_algo_raw) = patch.ha.as_deref() {
+            let patch_algo = patch_algo_raw.trim().to_lowercase();
+            if patch_algo.is_empty() {
+                return Err(err_root(
+                    DiagnosticCode::MissingField,
+                    "ha",
+                    "patch ha is empty".to_string(),
+                ));
+            }
+
+            let doc_algo = doc.hash_algorithm.trim().to_lowercase();
+            if patch_algo != doc_algo {
+                return Err(err_root(
+                    DiagnosticCode::HashAlgorithmMismatch,
+                    "ha",
+                    format!(
+                        "patch hash algorithm mismatch (patch.ha='{}', doc.hash_algorithm='{}')",
+                        patch_algo_raw, doc.hash_algorithm
+                    ),
+                ));
+            }
+        }
+    }
 
     if doc.page_hash != expected {
         return Err(err_root(
@@ -428,24 +460,70 @@ pub fn validate_patch_with_diagnostics(
                         ),
                     ));
                 }
-                let content = op.content.as_deref().ok_or_else(|| {
+
+                let new_block_id = op.new_block_id.as_deref().ok_or_else(|| {
                     err_op(
                         DiagnosticCode::MissingField,
                         i,
                         op.op,
                         Some(op.block_id.clone()),
-                        Some(format!("ops[{i}].content")),
-                        format!("ops[{i}] (insert_after) missing content"),
+                        Some(format!("ops[{i}].new_block_id")),
+                        format!("ops[{i}] (insert_after) missing new_block_id"),
                     )
                 })?;
-                if content.trim().is_empty() {
+                if new_block_id.trim().is_empty() {
                     return Err(err_op(
                         DiagnosticCode::ContentEmpty,
                         i,
                         op.op,
                         Some(op.block_id.clone()),
-                        Some(format!("ops[{i}].content")),
-                        format!("ops[{i}] (insert_after) content is empty"),
+                        Some(format!("ops[{i}].new_block_id")),
+                        format!("ops[{i}] (insert_after) new_block_id is empty"),
+                    ));
+                }
+                if doc.blocks.iter().any(|b| b.id == new_block_id) {
+                    return Err(err_op(
+                        DiagnosticCode::DuplicateBlockId,
+                        i,
+                        op.op,
+                        Some(op.block_id.clone()),
+                        Some(format!("ops[{i}].new_block_id")),
+                        format!(
+                            "ops[{i}] (insert_after) new_block_id '{}' already exists",
+                            new_block_id
+                        ),
+                    ));
+                }
+
+                let _kind_code = op.kind_code.ok_or_else(|| {
+                    err_op(
+                        DiagnosticCode::MissingField,
+                        i,
+                        op.op,
+                        Some(op.block_id.clone()),
+                        Some(format!("ops[{i}].kind_code")),
+                        format!("ops[{i}] (insert_after) missing kind_code"),
+                    )
+                })?;
+
+                let text = op.text.as_deref().ok_or_else(|| {
+                    err_op(
+                        DiagnosticCode::MissingField,
+                        i,
+                        op.op,
+                        Some(op.block_id.clone()),
+                        Some(format!("ops[{i}].text")),
+                        format!("ops[{i}] (insert_after) missing text"),
+                    )
+                })?;
+                if text.trim().is_empty() {
+                    return Err(err_op(
+                        DiagnosticCode::ContentEmpty,
+                        i,
+                        op.op,
+                        Some(op.block_id.clone()),
+                        Some(format!("ops[{i}].text")),
+                        format!("ops[{i}] (insert_after) text is empty"),
                     ));
                 }
             }
@@ -487,15 +565,15 @@ pub fn validate_patch_with_diagnostics(
                         ),
                     ));
                 }
-                if op.content.is_some() {
+                if op.text.is_some() || op.new_block_id.is_some() || op.kind_code.is_some() {
                     return Err(err_op(
                         DiagnosticCode::UnexpectedField,
                         i,
                         op.op,
                         Some(op.block_id.clone()),
-                        Some(format!("ops[{i}].content")),
+                        Some(format!("ops[{i}].text")),
                         format!(
-                            "ops[{i}] (suggest) unexpected content (suggest is non-mutating; use insert_after instead)"
+                            "ops[{i}] (suggest) unexpected insert_after fields (suggest is non-mutating; use insert_after instead)"
                         ),
                     ));
                 }
@@ -526,8 +604,33 @@ pub fn validate_patch_with_diagnostics(
     Ok(())
 }
 
+// -----------------------------------------------------------------------------
+// Helpers
+// -----------------------------------------------------------------------------
+
+/// Count non-overlapping occurrences of `needle` in `haystack`.
+///
+/// This is used for ambiguity detection and occurrence range validation.
+fn count_non_overlapping(haystack: &str, needle: &str) -> usize {
+    if needle.is_empty() {
+        return 0;
+    }
+
+    let mut count = 0usize;
+    let mut start = 0usize;
+    while let Some(pos) = haystack[start..].find(needle) {
+        count += 1;
+        start += pos + needle.len();
+        if start >= haystack.len() {
+            break;
+        }
+    }
+    count
+}
+
+/// Validate `before` safety constraints and return a structured diagnostic on failure.
 fn guard_before_diag(
-    i: usize,
+    op_index: usize,
     op: OpType,
     block_id: &str,
     before: &str,
@@ -536,456 +639,31 @@ fn guard_before_diag(
     if before.trim().is_empty() {
         return Err(err_op(
             DiagnosticCode::BeforeEmpty,
-            i,
+            op_index,
             op,
             Some(block_id.to_string()),
-            Some(format!("ops[{i}].before")),
-            format!("ops[{i}] before is empty/whitespace"),
+            Some(format!("ops[{op_index}].before")),
+            format!("ops[{op_index}] before is empty"),
         ));
     }
+
+    // Use char count to avoid surprising behavior with non-ASCII input.
     if before.chars().count() < min_before_len {
         return Err(err_op(
             DiagnosticCode::BeforeTooShort,
-            i,
+            op_index,
             op,
             Some(block_id.to_string()),
-            Some(format!("ops[{i}].before")),
+            Some(format!("ops[{op_index}].before")),
             format!(
-                "ops[{i}] before is too short (<{min_before_len} chars); likely ambiguous"
-            ),
-        ));
-    }
-    Ok(())
-}
-
-/// Count non-overlapping occurrences of `needle` in `haystack`, scanning left-to-right.
-///
-/// This matches RFC-0001 v1.0.2 occurrence semantics.
-fn count_non_overlapping(haystack: &str, needle: &str) -> usize {
-    if needle.is_empty() {
-        return 0;
-    }
-    let mut count = 0usize;
-    let mut offset = 0usize;
-    while let Some(pos) = haystack[offset..].find(needle) {
-        count += 1;
-        offset += pos + needle.len();
-        if offset >= haystack.len() {
-            break;
-        }
-    }
-    count
-}
-
-pub fn validate_patch_against_edit_packet(packet: &EditPacketV1, patch: &PatchV1) -> Result<(), String> {
-    validate_patch_against_edit_packet_with_options(packet, patch, ValidateOptions::default())
-}
-
-/// Validate a patch against an edit packet with configurable validator options.
-pub fn validate_patch_against_edit_packet_with_options(
-    packet: &EditPacketV1,
-    patch: &PatchV1,
-    opts: ValidateOptions,
-) -> Result<(), String> {
-    validate_patch_against_edit_packet_with_diagnostics(packet, patch, opts)
-        .map_err(|e| e.legacy_message())
-}
-
-/// Validate a patch against an edit packet and return structured diagnostics.
-pub fn validate_patch_against_edit_packet_with_diagnostics(
-    packet: &EditPacketV1,
-    patch: &PatchV1,
-    opts: ValidateOptions,
-) -> Result<(), ValidationError> {
-    if patch.v != 1 {
-        return Err(err_root(
-            DiagnosticCode::UnsupportedPatchVersion,
-            "v",
-            format!("unsupported patch version {}", patch.v),
-        ));
-    }
-    if packet.v != 1 {
-        return Err(err_root(
-            DiagnosticCode::UnsupportedEditPacketVersion,
-            "v",
-            format!("unsupported edit packet version {}", packet.v),
-        ));
-    }
-    // Safety binding: ensure the patch is only applied to the intended page version.
-    //
-    // A patch MUST be bound to a specific page hash either by including `h` in the patch,
-    // or by the caller providing an explicit `expected_page_hash` out-of-band.
-    let expected = match (patch.h.as_deref(), opts.expected_page_hash.as_deref()) {
-        (Some(patch_h), Some(expected_h)) => {
-            if patch_h != expected_h {
-                return Err(err_root(
-                    DiagnosticCode::PatchPageHashMismatch,
-                    "h",
-                    format!(
-                        "patch page hash mismatch (patch.h='{}' differs from expected_page_hash='{}')",
-                        patch_h, expected_h
-                    ),
-                ));
-            }
-            patch_h
-        }
-        (Some(patch_h), None) => patch_h,
-        (None, Some(expected_h)) => expected_h,
-        (None, None) => {
-            return Err(err_root(
-                DiagnosticCode::PatchPageHashMissing,
-                "h",
-                "patch is missing required page hash binding: include patch.h or provide expected_page_hash".to_string(),
-            ));
-        }
-    };
-
-    if packet.h != expected {
-        return Err(err_root(
-            DiagnosticCode::PatchPageHashMismatch,
-            "h",
-            format!(
-                "patch page hash mismatch (expected '{}', got '{}')",
-                expected, packet.h
+                "ops[{op_index}] before is too short (<{min_before_len} chars); likely ambiguous"
             ),
         ));
     }
 
-    for (i, op) in patch.ops.iter().enumerate() {
-        let (block_idx, block) = packet
-            .b
-            .iter()
-            .enumerate()
-            .find(|(_, t)| t.0 == op.block_id)
-            .ok_or_else(|| {
-            err_op(
-                DiagnosticCode::UnknownBlockId,
-                i,
-                op.op,
-                Some(op.block_id.clone()),
-                Some(format!("ops[{i}].block_id")),
-                format!("ops[{i}] references unknown block_id '{}'", op.block_id),
-            )
-        })?;
-
-        // RFC-0001 kind_code semantics define canonical v1 importance ranges.
-        // If the edit packet contains a non-canonical kind_code, reject early.
-        if !codebook::is_valid_v1(block.1) {
-            return Err(err_op(
-                DiagnosticCode::KindCodeOutOfRange,
-                i,
-                op.op,
-                Some(op.block_id.clone()),
-                Some(format!("b[{block_idx}][1]")),
-                format!(
-                    "edit packet block '{}' has non-canonical kind_code {} (expected 0-59 or 99)",
-                    op.block_id, block.1
-                ),
-            ));
-        }
-
-        // Optional strict safety gate: enforce kindCode policy.
-        // tuple layout: (id, kind, text_hash, text)
-        enforce_kind_code(i, op.op, &op.block_id, block.1, &opts)?;
-
-        // tuple layout: (id, kind, text_hash, text)
-        let block_text = &block.3;
-
-        match op.op {
-            OpType::Replace => {
-                let before = op.before.as_deref().ok_or_else(|| {
-                    err_op(
-                        DiagnosticCode::MissingField,
-                        i,
-                        op.op,
-                        Some(op.block_id.clone()),
-                        Some(format!("ops[{i}].before")),
-                        format!("ops[{i}] (replace) missing before"),
-                    )
-                })?;
-                let _after = op.after.as_deref().ok_or_else(|| {
-                    err_op(
-                        DiagnosticCode::MissingField,
-                        i,
-                        op.op,
-                        Some(op.block_id.clone()),
-                        Some(format!("ops[{i}].after")),
-                        format!("ops[{i}] (replace) missing after"),
-                    )
-                })?;
-
-                guard_before_diag(i, op.op, &op.block_id, before, opts.min_before_len)?;
-                let matches = count_non_overlapping(block_text, before);
-                if matches == 0 {
-                    return Err(err_op(
-                        DiagnosticCode::BeforeNotFound,
-                        i,
-                        op.op,
-                        Some(op.block_id.clone()),
-                        Some(format!("ops[{i}].before")),
-                        format!(
-                            "ops[{i}] (replace) before substring not found in block '{}'",
-                            op.block_id
-                        ),
-                    ));
-                }
-
-                match op.occurrence {
-                    None => {
-                        if matches > 1 {
-                            return Err(err_op(
-                                DiagnosticCode::BeforeAmbiguous,
-                                i,
-                                op.op,
-                                Some(op.block_id.clone()),
-                                Some(format!("ops[{i}].before")),
-                                format!(
-                                    "ops[{i}] (replace) before substring is ambiguous in block '{}' (matches {matches} times); provide occurrence",
-                                    op.block_id
-                                ),
-                            ));
-                        }
-                    }
-                    Some(Occurrence::Index(n)) => {
-                        if n == 0 || (n as usize) > matches {
-                            return Err(err_op(
-                                DiagnosticCode::OccurrenceOutOfRange,
-                                i,
-                                op.op,
-                                Some(op.block_id.clone()),
-                                Some(format!("ops[{i}].occurrence")),
-                                format!(
-                                    "ops[{i}] (replace) occurrence out of range for block '{}' (occurrence={n}, matches={matches})",
-                                    op.block_id
-                                ),
-                            ));
-                        }
-                    }
-                    Some(Occurrence::Legacy(_)) => {
-                        return Err(err_op(
-                            DiagnosticCode::UnexpectedField,
-                            i,
-                            op.op,
-                            Some(op.block_id.clone()),
-                            Some(format!("ops[{i}].occurrence")),
-                            format!(
-                                "ops[{i}] (replace) invalid occurrence value (legacy string values are delete-only; use integer occurrence)",
-                            ),
-                        ));
-                    }
-                }
-            }
-
-            OpType::Delete => {
-                let before = op.before.as_deref().ok_or_else(|| {
-                    err_op(
-                        DiagnosticCode::MissingField,
-                        i,
-                        op.op,
-                        Some(op.block_id.clone()),
-                        Some(format!("ops[{i}].before")),
-                        format!("ops[{i}] (delete) missing before"),
-                    )
-                })?;
-
-                guard_before_diag(i, op.op, &op.block_id, before, opts.min_before_len)?;
-                let matches = count_non_overlapping(block_text, before);
-                if matches == 0 {
-                    return Err(err_op(
-                        DiagnosticCode::BeforeNotFound,
-                        i,
-                        op.op,
-                        Some(op.block_id.clone()),
-                        Some(format!("ops[{i}].before")),
-                        format!(
-                            "ops[{i}] (delete) before substring not found in block '{}'",
-                            op.block_id
-                        ),
-                    ));
-                }
-
-                match op.occurrence {
-                    None => {
-                        if matches > 1 {
-                            return Err(err_op(
-                                DiagnosticCode::BeforeAmbiguous,
-                                i,
-                                op.op,
-                                Some(op.block_id.clone()),
-                                Some(format!("ops[{i}].before")),
-                                format!(
-                                    "ops[{i}] (delete) before substring is ambiguous in block '{}' (matches {matches} times); provide occurrence",
-                                    op.block_id
-                                ),
-                            ));
-                        }
-                    }
-                    Some(Occurrence::Index(n)) => {
-                        if n == 0 || (n as usize) > matches {
-                            return Err(err_op(
-                                DiagnosticCode::OccurrenceOutOfRange,
-                                i,
-                                op.op,
-                                Some(op.block_id.clone()),
-                                Some(format!("ops[{i}].occurrence")),
-                                format!(
-                                    "ops[{i}] (delete) occurrence out of range for block '{}' (occurrence={n}, matches={matches})",
-                                    op.block_id
-                                ),
-                            ));
-                        }
-                    }
-                    Some(Occurrence::Legacy(DeleteOccurrence::First)) => {}
-                    Some(Occurrence::Legacy(DeleteOccurrence::All)) => {}
-                }
-            }
-
-            OpType::InsertAfter => {
-                if op.occurrence.is_some() {
-                    return Err(err_op(
-                        DiagnosticCode::UnexpectedField,
-                        i,
-                        op.op,
-                        Some(op.block_id.clone()),
-                        Some(format!("ops[{i}].occurrence")),
-                        format!(
-                            "ops[{i}] (insert_after) unexpected occurrence (only valid for delete)"
-                        ),
-                    ));
-                }
-                if op.before.is_some() {
-                    return Err(err_op(
-                        DiagnosticCode::UnexpectedField,
-                        i,
-                        op.op,
-                        Some(op.block_id.clone()),
-                        Some(format!("ops[{i}].before")),
-                        format!(
-                            "ops[{i}] (insert_after) unexpected before (insert_after must not include before/after)"
-                        ),
-                    ));
-                }
-                if op.after.is_some() {
-                    return Err(err_op(
-                        DiagnosticCode::UnexpectedField,
-                        i,
-                        op.op,
-                        Some(op.block_id.clone()),
-                        Some(format!("ops[{i}].after")),
-                        format!(
-                            "ops[{i}] (insert_after) unexpected after (insert_after must not include before/after)"
-                        ),
-                    ));
-                }
-                if op.message.is_some() {
-                    return Err(err_op(
-                        DiagnosticCode::UnexpectedField,
-                        i,
-                        op.op,
-                        Some(op.block_id.clone()),
-                        Some(format!("ops[{i}].message")),
-                        format!(
-                            "ops[{i}] (insert_after) unexpected message (insert_after is mutating; use suggest instead)"
-                        ),
-                    ));
-                }
-                let content = op.content.as_deref().ok_or_else(|| {
-                    err_op(
-                        DiagnosticCode::MissingField,
-                        i,
-                        op.op,
-                        Some(op.block_id.clone()),
-                        Some(format!("ops[{i}].content")),
-                        format!("ops[{i}] (insert_after) missing content"),
-                    )
-                })?;
-                if content.trim().is_empty() {
-                    return Err(err_op(
-                        DiagnosticCode::ContentEmpty,
-                        i,
-                        op.op,
-                        Some(op.block_id.clone()),
-                        Some(format!("ops[{i}].content")),
-                        format!("ops[{i}] (insert_after) content is empty"),
-                    ));
-                }
-            }
-
-            OpType::Suggest => {
-                if op.occurrence.is_some() {
-                    return Err(err_op(
-                        DiagnosticCode::UnexpectedField,
-                        i,
-                        op.op,
-                        Some(op.block_id.clone()),
-                        Some(format!("ops[{i}].occurrence")),
-                        format!(
-                            "ops[{i}] (suggest) unexpected occurrence (only valid for delete)"
-                        ),
-                    ));
-                }
-                if op.before.is_some() {
-                    return Err(err_op(
-                        DiagnosticCode::UnexpectedField,
-                        i,
-                        op.op,
-                        Some(op.block_id.clone()),
-                        Some(format!("ops[{i}].before")),
-                        format!(
-                            "ops[{i}] (suggest) unexpected before (suggest must not include before/after)"
-                        ),
-                    ));
-                }
-                if op.after.is_some() {
-                    return Err(err_op(
-                        DiagnosticCode::UnexpectedField,
-                        i,
-                        op.op,
-                        Some(op.block_id.clone()),
-                        Some(format!("ops[{i}].after")),
-                        format!(
-                            "ops[{i}] (suggest) unexpected after (suggest must not include before/after)"
-                        ),
-                    ));
-                }
-                if op.content.is_some() {
-                    return Err(err_op(
-                        DiagnosticCode::UnexpectedField,
-                        i,
-                        op.op,
-                        Some(op.block_id.clone()),
-                        Some(format!("ops[{i}].content")),
-                        format!(
-                            "ops[{i}] (suggest) unexpected content (suggest is non-mutating; use insert_after instead)"
-                        ),
-                    ));
-                }
-                let msg = op.message.as_deref().ok_or_else(|| {
-                    err_op(
-                        DiagnosticCode::MissingField,
-                        i,
-                        op.op,
-                        Some(op.block_id.clone()),
-                        Some(format!("ops[{i}].message")),
-                        format!("ops[{i}] (suggest) missing message"),
-                    )
-                })?;
-                if msg.trim().is_empty() {
-                    return Err(err_op(
-                        DiagnosticCode::MessageEmpty,
-                        i,
-                        op.op,
-                        Some(op.block_id.clone()),
-                        Some(format!("ops[{i}].message")),
-                        format!("ops[{i}] (suggest) message is empty"),
-                    ));
-                }
-            }
-        }
-    }
-
     Ok(())
 }
+
 
 fn err_root(code: DiagnosticCode, path: &str, message: String) -> ValidationError {
     ValidationError::single(ValidationDiagnostic {
@@ -1115,4 +793,69 @@ pub fn validate_patch_with_telemetry(
     };
 
     (res.map(|_| ()), tel)
+}
+
+
+// -----------------------------------------------------------------------------
+// Edit Packet validators
+// -----------------------------------------------------------------------------
+
+/// Validate a patch against an Edit Packet.
+///
+/// This is the preferred validation surface for AI pipelines because it avoids
+/// requiring reconstruction of a full `Document`.
+pub fn validate_patch_against_edit_packet(packet: &EditPacketV1, patch: &PatchV1) -> Result<(), String> {
+    validate_patch_against_edit_packet_with_options(packet, patch, ValidateOptions::default())
+}
+
+/// Validate a patch against an Edit Packet with configurable validator options.
+pub fn validate_patch_against_edit_packet_with_options(
+    packet: &EditPacketV1,
+    patch: &PatchV1,
+    opts: ValidateOptions,
+) -> Result<(), String> {
+    validate_patch_against_edit_packet_with_diagnostics(packet, patch, opts).map_err(|e| e.legacy_message())
+}
+
+/// Validate a patch against an Edit Packet and return structured diagnostics.
+///
+/// Note on page-hash binding:
+/// - When validating against an Edit Packet, the packet's `h` value is authoritative.
+/// - If the patch omits `h`, we bind it implicitly to the packet by defaulting
+///   `expected_page_hash` to `packet.h`.
+pub fn validate_patch_against_edit_packet_with_diagnostics(
+    packet: &EditPacketV1,
+    patch: &PatchV1,
+    mut opts: ValidateOptions,
+) -> Result<(), ValidationError> {
+    if packet.v != 1 {
+        return Err(err_root(
+            DiagnosticCode::UnsupportedEditPacketVersion,
+            "v",
+            format!("unsupported edit packet version {}", packet.v),
+        ));
+    }
+
+    // Default the expected page hash to the edit packet's hash so patches may omit `h`
+    // when the validator has access to the authoritative packet.
+    if opts.expected_page_hash.is_none() {
+        opts.expected_page_hash = Some(packet.h.clone());
+    }
+
+    let doc = Document {
+        page_hash: packet.h.clone(),
+        hash_algorithm: packet.ha.clone(),
+        blocks: packet
+            .b
+            .iter()
+            .map(|t| bdir_core::model::Block {
+                id: t.0.clone(),
+                kind_code: t.1,
+                text_hash: t.2.clone(),
+                text: t.3.clone(),
+            })
+            .collect(),
+    };
+
+    validate_patch_with_diagnostics(&doc, patch, opts)
 }

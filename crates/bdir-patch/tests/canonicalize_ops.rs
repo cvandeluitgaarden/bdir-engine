@@ -6,7 +6,7 @@ use bdir_patch::{
 };
 
 fn mk_patch(ops: Vec<PatchOpV1>) -> PatchV1 {
-    PatchV1 { v: 1, h: None, ops }
+    PatchV1 { v: 1, h: None, ha: None, ops }
 }
 
 fn op(op: OpType, block_id: &str) -> PatchOpV1 {
@@ -16,8 +16,11 @@ fn op(op: OpType, block_id: &str) -> PatchOpV1 {
         before: None,
         after: None,
         occurrence: None,
-        content: None,
+        new_block_id: None,
+        kind_code: None,
+        text: None,
         message: None,
+        severity: None,
     }
 }
 

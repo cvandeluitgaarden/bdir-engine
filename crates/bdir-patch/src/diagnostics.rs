@@ -13,6 +13,10 @@ pub enum DiagnosticCode {
     UnsupportedEditPacketVersion,
     PatchPageHashMismatch,
     PatchPageHashMissing,
+    /// Patch hash algorithm (`ha`) does not match the target document/packet algorithm.
+    HashAlgorithmMismatch,
+    /// insert_after `new_block_id` conflicts with an existing block id.
+    DuplicateBlockId,
     UnknownBlockId,
     MissingField,
     UnexpectedField,

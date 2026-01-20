@@ -24,6 +24,7 @@ fn apply_patch_against_document_updates_text_and_hashes() {
     .unwrap();
 
     patch.h = Some(doc.page_hash.clone());
+    patch.ha = Some(doc.hash_algorithm.clone());
 
     let updated = apply_patch_against_document(&doc, &patch).unwrap();
     assert!(updated.blocks[0].text.contains("the first paragraph"));

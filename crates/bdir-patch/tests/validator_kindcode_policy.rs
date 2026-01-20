@@ -33,14 +33,18 @@ fn strict_kindcode_blocks_mutation_outside_default_allow_range() {
     let patch = PatchV1 {
         v: 1,
         h: Some(doc.page_hash.clone()),
+        ha: Some(doc.hash_algorithm.clone()),
         ops: vec![PatchOpV1 {
             op: OpType::Replace,
             block_id: "boiler".to_string(),
             before: Some("Cookie".to_string()),
             after: Some("Consent".to_string()),
             occurrence: None,
-            content: None,
+            new_block_id: None,
+            kind_code: None,
+            text: None,
             message: None,
+            severity: None,
         }],
     };
 
@@ -57,14 +61,18 @@ fn strict_kindcode_allows_suggest_any_by_default() {
     let patch = PatchV1 {
         v: 1,
         h: Some(doc.page_hash.clone()),
+        ha: Some(doc.hash_algorithm.clone()),
         ops: vec![PatchOpV1 {
             op: OpType::Suggest,
             block_id: "boiler".to_string(),
             before: None,
             after: None,
             occurrence: None,
-            content: None,
+            new_block_id: None,
+            kind_code: None,
+            text: None,
             message: Some("Consider minimizing this banner.".to_string()),
+            severity: None,
         }],
     };
 
@@ -80,6 +88,7 @@ fn strict_kindcode_allows_custom_ranges() {
     let patch = PatchV1 {
         v: 1,
         h: Some(doc.page_hash.clone()),
+        ha: Some(doc.hash_algorithm.clone()),
         ops: vec![PatchOpV1 {
             op: OpType::Delete,
             block_id: "boiler".to_string(),
@@ -88,8 +97,11 @@ fn strict_kindcode_allows_custom_ranges() {
             occurrence: Some(bdir_patch::schema::Occurrence::Legacy(
                 bdir_patch::schema::DeleteOccurrence::First,
             )),
-            content: None,
+            new_block_id: None,
+            kind_code: None,
+            text: None,
             message: None,
+            severity: None,
         }],
     };
 

@@ -55,6 +55,7 @@ fn conformance_matrix() {
 
     for c in &mut cases {
         c.patch.h = Some(packet.h.clone());
+        c.patch.ha = Some(packet.ha.clone());
     }
 
     let mut passed = 0usize;

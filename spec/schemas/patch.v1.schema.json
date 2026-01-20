@@ -8,6 +8,7 @@
   "properties": {
     "v": { "type": "integer", "const": 1 },
     "h": { "type": "string", "minLength": 1 },
+    "ha": { "type": "string", "minLength": 1 },
     "ops": {
       "type": "array",
       "items": { "$ref": "#/definitions/op" }
@@ -35,6 +36,12 @@
           ]
         },
         "content": { "type": "string" },
+        "new_block_id": { "type": "string", "minLength": 1 },
+        "newBlockId": { "type": "string", "minLength": 1 },
+        "kind_code": { "type": "string", "minLength": 1 },
+        "kindCode": { "type": "string", "minLength": 1 },
+        "text": { "type": "string" },
+        "severity": { "type": "string", "enum": ["low", "medium", "high"] },
         "message": { "type": "string" }
       },
       "allOf": [
@@ -60,13 +67,33 @@
         {
           "if": { "properties": { "op": { "const": "insert_after" } } },
           "then": {
-            "required": ["content"],
+            "allOf": [
+              {
+                "oneOf": [
+                  { "required": ["new_block_id"], "not": { "required": ["newBlockId"] } },
+                  { "required": ["newBlockId"], "not": { "required": ["new_block_id"] } }
+                ]
+              },
+              {
+                "oneOf": [
+                  { "required": ["kind_code"], "not": { "required": ["kindCode"] } },
+                  { "required": ["kindCode"], "not": { "required": ["kind_code"] } }
+                ]
+              },
+              {
+                "oneOf": [
+                  { "required": ["text"], "not": { "required": ["content"] } },
+                  { "required": ["content"], "not": { "required": ["text"] } }
+                ]
+              }
+            ],
             "not": {
               "anyOf": [
                 { "required": ["before"] },
                 { "required": ["after"] },
                 { "required": ["message"] },
-                { "required": ["occurrence"] }
+                { "required": ["occurrence"] },
+                { "required": ["severity"] }
               ]
             }
           }
@@ -80,6 +107,11 @@
                 { "required": ["before"] },
                 { "required": ["after"] },
                 { "required": ["content"] },
+                { "required": ["text"] },
+                { "required": ["new_block_id"] },
+                { "required": ["newBlockId"] },
+                { "required": ["kind_code"] },
+                { "required": ["kindCode"] },
                 { "required": ["occurrence"] }
               ]
             }

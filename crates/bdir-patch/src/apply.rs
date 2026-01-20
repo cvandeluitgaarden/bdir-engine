@@ -15,7 +15,7 @@ use bdir_editpacket::{BlockTupleV1, EditPacketV1};
 /// Deterministic semantics:
 /// - replace: replace an unambiguous match of `before` with `after` (or a selected `occurrence`)
 /// - delete: delete an unambiguous match of `before` (or a selected `occurrence`)
-/// - insert_after: inserts a new block AFTER the referenced block_id, with `text = after`
+/// - insert_after: inserts a new block AFTER the referenced block_id
 /// - suggest: no mutation (informational only)
 ///
 /// Safety:
@@ -113,24 +113,40 @@ pub fn apply_patch_against_edit_packet_with_options(
                     None => delete_first(&current_text, before),
                 };
             }
-
             OpType::InsertAfter => {
-                let content = op
-                    .content
+                let new_block_id = op
+                    .new_block_id
                     .as_deref()
-                    .ok_or_else(|| "ops insert_after missing content (should be validated)".to_string())?;
+                    .ok_or_else(|| {
+                        "ops insert_after missing new_block_id (should be validated)".to_string()
+                    })?;
+                let kind_code = op
+                    .kind_code
+                    .ok_or_else(|| {
+                        "ops insert_after missing kind_code (should be validated)".to_string()
+                    })?;
+                let text = op
+                    .text
+                    .as_deref()
+                    .ok_or_else(|| "ops insert_after missing text (should be validated)".to_string())?;
 
                 let anchor_idx = find_block_index(&out.b, &op.block_id)
                     .ok_or_else(|| format!("unknown block_id '{}'", op.block_id))?;
 
-                // Inherit kindCode from anchor for now (simple + deterministic).
-                let anchor_kind = out.b[anchor_idx].1;
-
-                // Create deterministic id: "<anchor>_ins", "<anchor>_ins2", ...
-                let new_id = make_insert_id_editpacket(&out.b, &op.block_id);
+                if out.b.iter().any(|t| t.0 == new_block_id) {
+                    return Err(format!(
+                        "insert_after new_block_id '{}' already exists",
+                        new_block_id
+                    ));
+                }
 
                 // Placeholder hash, recomputed at the end.
-                let new_tuple: BlockTupleV1 = (new_id, anchor_kind, String::new(), content.to_string());
+                let new_tuple: BlockTupleV1 = (
+                    new_block_id.to_string(),
+                    kind_code,
+                    String::new(),
+                    text.to_string(),
+                );
 
                 out.b.insert(anchor_idx + 1, new_tuple);
             }
@@ -230,22 +246,35 @@ pub fn apply_patch_against_document(doc: &Document, patch: &PatchV1) -> Result<D
             }
 
             OpType::InsertAfter => {
-                let content = op
-                    .content
+                let new_block_id = op
+                    .new_block_id
                     .as_deref()
-                    .ok_or_else(|| "ops insert_after missing content (should be validated)".to_string())?;
+                    .ok_or_else(|| {
+                        "ops insert_after missing new_block_id (should be validated)".to_string()
+                    })?;
+                let kind_code = op.kind_code.ok_or_else(|| {
+                    "ops insert_after missing kind_code (should be validated)".to_string()
+                })?;
+                let text = op
+                    .text
+                    .as_deref()
+                    .ok_or_else(|| "ops insert_after missing text (should be validated)".to_string())?;
 
                 let anchor_idx = find_doc_block_index(&out.blocks, &op.block_id)
                     .ok_or_else(|| format!("unknown block_id '{}'", op.block_id))?;
 
-                let anchor_kind = out.blocks[anchor_idx].kind_code;
+                if out.blocks.iter().any(|b| b.id == new_block_id) {
+                    return Err(format!(
+                        "insert_after new_block_id '{}' already exists",
+                        new_block_id
+                    ));
+                }
 
-                let new_id = make_insert_id_doc(&out.blocks, &op.block_id);
                 let new_block = Block {
-                    id: new_id,
-                    kind_code: anchor_kind,
+                    id: new_block_id.to_string(),
+                    kind_code,
                     text_hash: String::new(),
-                    text: content.to_string(),
+                    text: text.to_string(),
                 };
 
                 out.blocks.insert(anchor_idx + 1, new_block);
@@ -307,40 +336,8 @@ fn delete_first(haystack: &str, needle: &str) -> String {
 }
 
 /// Deterministic inserted id: "<anchor>_ins", or "<anchor>_ins2", "_ins3", ...
-fn make_insert_id_editpacket(blocks: &[BlockTupleV1], anchor_id: &str) -> String {
-    let base = format!("{anchor_id}_ins");
-
-    if !blocks.iter().any(|t| t.0 == base) {
-        return base;
-    }
-
-    for n in 2u32.. {
-        let candidate = format!("{base}{n}");
-        if !blocks.iter().any(|t| t.0 == candidate) {
-            return candidate;
-        }
-    }
-
-    base
-}
 
 /// Deterministic inserted id: "<anchor>_ins", or "<anchor>_ins2", "_ins3", ...
-fn make_insert_id_doc(blocks: &[Block], anchor_id: &str) -> String {
-    let base = format!("{anchor_id}_ins");
-
-    if !blocks.iter().any(|b| b.id == base) {
-        return base;
-    }
-
-    for n in 2u32.. {
-        let candidate = format!("{base}{n}");
-        if !blocks.iter().any(|b| b.id == candidate) {
-            return candidate;
-        }
-    }
-
-    base
-}
 
 /// Recompute block text hashes and packet hash `h`.
 ///
