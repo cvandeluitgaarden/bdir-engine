@@ -1,0 +1,76 @@
+{
+  "version": 1,
+  "ranges": [
+    {
+      "min": 0,
+      "max": 19,
+      "meaning": "core content or structure"
+    },
+    {
+      "min": 20,
+      "max": 39,
+      "meaning": "boilerplate or navigation"
+    },
+    {
+      "min": 40,
+      "max": 59,
+      "meaning": "user interface chrome"
+    },
+    {
+      "min": 99,
+      "max": 99,
+      "meaning": "unknown or uncategorized"
+    }
+  ],
+  "codes": {
+    "0": {
+      "id": "title",
+      "label": "Title"
+    },
+    "1": {
+      "id": "heading",
+      "label": "Heading"
+    },
+    "2": {
+      "id": "paragraph",
+      "label": "Paragraph"
+    },
+    "3": {
+      "id": "list",
+      "label": "List"
+    },
+    "4": {
+      "id": "table",
+      "label": "Table"
+    },
+    "5": {
+      "id": "figure",
+      "label": "Figure / Image"
+    },
+    "20": {
+      "id": "breadcrumb",
+      "label": "Breadcrumb navigation"
+    },
+    "21": {
+      "id": "secondary-nav",
+      "label": "Secondary navigation"
+    },
+    "22": {
+      "id": "related-content",
+      "label": "Related content block"
+    },
+    "40": {
+      "id": "ui-control",
+      "label": "UI control or widget"
+    },
+    "41": {
+      "id": "icon-only",
+      "label": "Icon-only UI element"
+    },
+    "99": {
+      "id": "unknown",
+      "label": "Unknown or unclassified",
+      "notes": "Fallback when classification is uncertain."
+    }
+  }
+}

@@ -1,0 +1,45 @@
+{
+  "id": "v006",
+  "title": "Unicode normalization mismatch (byte-unequal visual match)",
+  "reference": true,
+  "links": [
+    "RFC-0001 §8.3 (Validation requirements: before must match verbatim)",
+    "docs/implementation-notes.md#unicode-normalization-guidance (recommended consistent normalization)"
+  ],
+  "context": {
+    "current_page_hash": "ffffffffffffffff"
+  },
+  "packet": {
+    "v": 1,
+    "tid": "fixture-v006",
+    "h": "ffffffffffffffff",
+    "ha": "sha256",
+    "b": [
+      [
+        "p1",
+        2,
+        "1111222233334444",
+        "Cafeé"
+      ]
+    ]
+  },
+  "patch": {
+    "v": 1,
+    "ops": [
+      {
+        "op": "replace",
+        "block_id": "p1",
+        "before": "Café",
+        "after": "Café",
+        "message": "Normalize unicode (NFC vs NFD)"
+      }
+    ],
+    "h": "ffffffffffffffff",
+    "ha": "sha256"
+  },
+  "expect": {
+    "valid": false,
+    "reason": "before_not_found_due_to_unicode_normalization",
+    "notes": "Visually identical strings can be byte-different (NFC vs NFD). Exact matching should fail unless the extraction/canonicalization pipeline normalizes consistently upstream."
+  }
+}

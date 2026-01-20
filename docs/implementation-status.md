@@ -41,10 +41,10 @@ It does **not** override, amend, or reinterpret the RFC.
 
 | Feature | RFC Status | Implementation Status | Notes |
 |------|-----------|-----------------------|------|
-| Block-level patch operations | REQUIRED | ✅ Implemented | `replace`, `delete`, `suggest` |
-| Page-level content hash binding | SHOULD | ⚠️ Partial | Generation supported; enforcement optional |
+| Block-level patch operations | REQUIRED | ✅ Implemented | `replace`, `delete`, `insert_after`, `suggest` |
+| Page-level content hash binding | REQUIRED | ✅ Implemented (configurable) | Patch `h` binding validated; enforcement may be toggled via options in some integration layers |
 | Deterministic patch validation | REQUIRED | ✅ Implemented | All-or-nothing semantics |
-| kindCode importance guidance | SHOULD | ✅ Implemented | Prompt-level only |
+| kind_code importance guidance | SHOULD | ✅ Implemented | Prompt-level only |
 | Caching guidance | SHOULD | ⚠️ External | Engine-agnostic |
 | Telemetry fields | SHOULD | ❌ Not implemented | Planned |
 

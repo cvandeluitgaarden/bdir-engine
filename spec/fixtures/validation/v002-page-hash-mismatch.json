@@ -1,0 +1,45 @@
+{
+  "id": "v002",
+  "title": "Reject patch when page hash does not match",
+  "reference": true,
+  "links": [
+    "RFC-0001 §6.3 (Edit Packet field semantics: h)",
+    "RFC-0001 §9 (Patch application: page-level content hash matches)"
+  ],
+  "context": {
+    "current_page_hash": "bbbbbbbbbbbbbbbb"
+  },
+  "packet": {
+    "v": 1,
+    "tid": "fixture-v002",
+    "h": "aaaaaaaaaaaaaaaa",
+    "ha": "sha256",
+    "b": [
+      [
+        "p1",
+        2,
+        "1111222233334444",
+        "Hello world."
+      ]
+    ]
+  },
+  "patch": {
+    "v": 1,
+    "ops": [
+      {
+        "op": "replace",
+        "block_id": "p1",
+        "before": "world",
+        "after": "World",
+        "message": "Capitalize for style."
+      }
+    ],
+    "h": "aaaaaaaaaaaaaaaa",
+    "ha": "sha256"
+  },
+  "expect": {
+    "valid": false,
+    "reason": "page_hash_mismatch",
+    "notes": "The patch MUST NOT be applied when the page-level content hash does not match the current page hash."
+  }
+}

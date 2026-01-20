@@ -1,0 +1,46 @@
+{
+  "id": "v005",
+  "title": "Suggest is advisory and must not mutate content",
+  "reference": true,
+  "links": [
+    "RFC-0001 §8.2 (Supported operations: suggest)",
+    "RFC-0001 §9 (Patch application: mutating ops require before; suggest is not applied as edit)",
+    "spec/schemas/ai-patch.schema.json (suggest op has no before/after requirements)"
+  ],
+  "context": {
+    "applyMode": "apply",
+    "current_page_hash": "eeeeeeeeeeeeeeee"
+  },
+  "packet": {
+    "v": 1,
+    "tid": "fixture-v005",
+    "h": "eeeeeeeeeeeeeeee",
+    "ha": "sha256",
+    "b": [
+      [
+        "p1",
+        2,
+        "1111222233334444",
+        "This paragraph is a bit long and could be split for readability."
+      ]
+    ]
+  },
+  "patch": {
+    "v": 1,
+    "ops": [
+      {
+        "op": "suggest",
+        "block_id": "p1",
+        "message": "Consider splitting this paragraph into two sentences.",
+        "severity": "low"
+      }
+    ],
+    "h": "eeeeeeeeeeeeeeee",
+    "ha": "sha256"
+  },
+  "expect": {
+    "valid": true,
+    "reason": "advisory_only",
+    "notes": "A `suggest` op is considered valid, but must not result in any content mutation when applying patches. Consumers may ignore suggestions without affecting correctness."
+  }
+}

@@ -1,0 +1,47 @@
+{
+  "id": "v008",
+  "title": "Truncated page and block hashes validate (>= 8 hex chars)",
+  "reference": true,
+  "links": [
+    "RFC-0001 §5.1.4 (text_hash truncation semantics)",
+    "RFC-0001 §6.3 (Edit Packet field semantics: h/ha)",
+    "spec/schemas/bdir-edit-packet.ultra-min.v1.schema.json (minLength 8, hex pattern)",
+    "spec/schemas/ai-patch.schema.json (minLength 8, hex pattern)"
+  ],
+  "context": {
+    "current_page_hash": "deadbeef"
+  },
+  "packet": {
+    "v": 1,
+    "tid": "fixture-v008",
+    "h": "deadbeef",
+    "ha": "sha256",
+    "b": [
+      [
+        "p1",
+        2,
+        "cafebabe",
+        "This is fine."
+      ]
+    ]
+  },
+  "patch": {
+    "v": 1,
+    "ops": [
+      {
+        "op": "replace",
+        "block_id": "p1",
+        "before": "fine",
+        "after": "great",
+        "message": "Small wording improvement."
+      }
+    ],
+    "h": "deadbeef",
+    "ha": "sha256"
+  },
+  "expect": {
+    "valid": true,
+    "reason": "truncated_hashes_ok",
+    "notes": "Both page hash and text_hash are 8-hex-character prefixes, which is the minimum allowed truncation length."
+  }
+}

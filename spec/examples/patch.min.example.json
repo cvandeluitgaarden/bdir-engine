@@ -1,0 +1,29 @@
+{
+  "v": 1,
+  "h": "0f0e0d0c0b0a0908",
+  "ops": [
+    {
+      "op": "replace",
+      "block_id": "p1",
+      "before": "teh",
+      "after": "the"
+    },
+    {
+      "op": "delete",
+      "block_id": "b1",
+      "before": "Home > Section > Page"
+    },
+    {
+      "op": "insert_after",
+      "block_id": "p1",
+      "new_block_id": "p2",
+      "kind_code": 2,
+      "text": "This is a newly inserted paragraph."
+    },
+    {
+      "op": "suggest",
+      "block_id": "p2",
+      "message": "Consider splitting this long paragraph into two for readability."
+    }
+  ]
+}

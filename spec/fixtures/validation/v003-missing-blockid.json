@@ -1,0 +1,44 @@
+{
+  "id": "v003",
+  "title": "Reject op missing block_id (schema validation)",
+  "reference": true,
+  "links": [
+    "RFC-0001 §8.3 (Validation requirements: ops MUST reference an existing block_id)",
+    "spec/schemas/ai-patch.schema.json ($defs.block_id required for ops)"
+  ],
+  "context": {
+    "current_page_hash": "cccccccccccccccc"
+  },
+  "packet": {
+    "v": 1,
+    "tid": "fixture-v003",
+    "h": "cccccccccccccccc",
+    "ha": "sha256",
+    "b": [
+      [
+        "p1",
+        2,
+        "1111222233334444",
+        "Speling mistake."
+      ]
+    ]
+  },
+  "patch": {
+    "v": 1,
+    "ops": [
+      {
+        "op": "replace",
+        "before": "Speling",
+        "after": "Spelling",
+        "message": "Fix typo, but block_id is missing (invalid)."
+      }
+    ],
+    "h": "cccccccccccccccc",
+    "ha": "sha256"
+  },
+  "expect": {
+    "valid": false,
+    "reason": "schema_invalid_missing_block_id",
+    "notes": "This fixture is expected to fail patch schema validation because the operation omits the required `block_id`."
+  }
+}

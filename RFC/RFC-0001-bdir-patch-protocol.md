@@ -2,15 +2,15 @@
 
 **Status:** Draft  
 **Intended Status:** Informational  
-**Version:** 1.0.0  
-**Last Updated:** 2026-01-19  
+**Version:** 1.0.2  
+**Last Updated:** 2026-01-20  
 **Authors:** C.A.G. van de Luitgaarden
 
 ---
 
 ## Abstract
 
-This document specifies the **BDIR Patch Protocol**, a stateless protocol for AI-assisted content review. The protocol constrains AI systems to analyze complete documents while producing block-scoped patch instructions rather than rewritten content. It is designed to support deterministic validation, auditability, and human-in-the-loop workflows in regulated or large-scale content environments.
+This document specifies the **BDIR Patch Protocol**, a stateless protocol that defines how AI systems propose **block-scoped patch instructions** for human- or system-reviewed document updates. The protocol constrains AI systems to analyze complete documents while producing patch instructions rather than rewritten content. It is designed to support deterministic validation, auditability, and human-in-the-loop workflows in regulated or large-scale content environments.
 
 ---
 
@@ -39,6 +39,8 @@ Recent advances in large language models (LLMs) have enabled automated analysis 
 
 The BDIR Patch Protocol defines a different interaction model. Under this protocol, an AI system analyzes a complete document but is restricted to producing a set of deterministic, block-level patch instructions. These instructions can be validated, reviewed, and applied by downstream systems under strict safety constraints.
 
+The protocol defines a strict contract between an AI system acting as an untrusted proposer and a downstream system responsible for validation and application.
+
 The protocol is intentionally stateless, AI-agnostic, and independent of any specific content management system. It is designed to enable automation while preserving human oversight and traceability.
 
 ---
@@ -61,7 +63,11 @@ An atomic unit of content identified by a stable identifier.
 
 ## 2.1 JSON Field Naming (Normative)
 
+This requirement applies to all normative JSON wire formats defined by this RFC.
+
 All JSON field names defined by this specification **MUST** use **snake_case**.
+
+This requirement applies to all normative JSON wire formats defined by this RFC.
 
 This requirement applies to the v1 JSON wire formats defined in this document, including:
 
@@ -78,6 +84,8 @@ This requirement applies to the v1 JSON wire formats defined in this document, i
 ## 2.2 Unicode Normalization (Normative)
 
 This protocol operates on JSON strings, which are Unicode text. Many Unicode sequences have multiple equivalent representations (for example, precomposed characters versus combining sequences). Without explicit normalization rules, hash computation and substring matching can become non-interoperable.
+
+Without explicit normalization, semantically identical content may fail validation due to byte-level differences.
 
 To preserve deterministic behavior across producers and receivers:
 
@@ -107,7 +115,7 @@ The BDIR Patch Protocol is designed to:
 
 ### 3.2 Non-Goals
 
-The protocol does not aim to:
+The protocol explicitly does not attempt to:
 
 - Enable real-time collaborative editing
 - Automatically resolve conflicting edits
@@ -388,6 +396,8 @@ Required fields:
 `insert_after` operations **MUST NOT** include `before` or `after` fields.
 
 ### 8.2.4 `suggest` operation semantics
+
+Unlike the preceding operations, `suggest` does not represent a deterministic content mutation.
 
 The `suggest` operation is **non-mutating** and **advisory**. It exists to carry human-readable review notes that do not deterministically apply changes.
 

@@ -1,0 +1,45 @@
+{
+  "id": "v007",
+  "title": "Edit Packet omitted ha defaults to sha256 (truncated hashes allowed)",
+  "reference": true,
+  "links": [
+    "RFC-0001 §6.3 (Edit Packet field semantics: ha defaulting)",
+    "RFC-0001 §5.1.4 (text_hash truncation semantics)",
+    "RFC-0001 §9 (Patch application: hash binding)",
+    "spec/schemas/bdir-edit-packet.ultra-min.v1.schema.json (ha optional; sha256 bounds when omitted)"
+  ],
+  "context": {
+    "current_page_hash": "0123456789abcdef"
+  },
+  "packet": {
+    "v": 1,
+    "tid": "fixture-v007",
+    "h": "0123456789abcdef",
+    "b": [
+      [
+        "p1",
+        2,
+        "1111222233334444",
+        "Hello world."
+      ]
+    ]
+  },
+  "patch": {
+    "v": 1,
+    "ops": [
+      {
+        "op": "replace",
+        "block_id": "p1",
+        "before": "world",
+        "after": "World",
+        "message": "Capitalize for style."
+      }
+    ],
+    "h": "0123456789abcdef"
+  },
+  "expect": {
+    "valid": true,
+    "reason": "ha_default_sha256",
+    "notes": "Both packet and patch omit ha; receivers MUST treat ha as sha256. Hashes are lowercase hex and may be truncated prefixes (>= 8)."
+  }
+}

@@ -16,6 +16,10 @@ This repository implements the protocol defined in the `bdir-spec` repository.
 - **Current:** early reference implementation (focus: correctness and determinism)
 - **Goal:** stable libraries + a minimal CLI for inspection, validation, and patch application
 
+## Protocol version
+
+This engine targets **BDIR Patch Protocol v1.0.2** (RFC-0001).
+
 ---
 
 ## Implementation status
@@ -28,12 +32,11 @@ For current engine support, known gaps, and planned work, see:
 
 ---
 
-
 ## What is BDIR?
 
 BDIR (Block-based Document Intermediate Representation) represents a document as an ordered list of semantic blocks, each with:
 - a stable identifier
-- a semantic classification (`kindCode`)
+- a semantic classification (`kind_code`)
 - canonical text content
 - a text hash
 
@@ -55,12 +58,10 @@ This engine works with three JSON-adjacent representations:
 - **Edit Packet** and **Patch** follow the RFC wire formats exactly, including their field names
   (e.g. Edit Packet keys like `v`, `tid`, `h`, `ha`, `b`, and Patch operation field `block_id`).
 
-Compatibility note: this engine accepts legacy Patch v1 JSON that uses `blockId` for patch operations,
-but serializes `block_id`.
+Compatibility note: this engine accepts legacy Patch v1 JSON that uses `blockId` (camelCase) for operation targeting,
+but **serializes** the canonical RFC field name `block_id`.
 
 See RFC-0001 "Edit Packet" (Section 6) and "Patch Instructions" (Section 8) for the normative wire formats.
-
-Compatibility note: for Patch v1 operation targeting, this engine **serializes** `block_id` and **also accepts** legacy `blockId` when parsing patches.
 
 ### Required top-level Document fields
 
@@ -95,13 +96,12 @@ Minimal example:
 
 Note: when `text_hash` and/or `page_hash` are missing or empty, tools in this repo may recompute them deterministically.
 
-
 ## Components
 
 This workspace is split into small crates:
 
 - **bdir-core**: core data model (blocks, documents, hashing)
-- **bdir-codebook**: kindCode mappings and importance semantics
+- **bdir-codebook**: kind_code mappings and importance semantics
 - **bdir-editpacket**: generate Edit Packets (minified or pretty)
 - **bdir-patch**: patch model, validation, and deterministic apply
 - **bdir-io**: JSON IO helpers and canonicalization utilities
@@ -130,15 +130,15 @@ bdir inspect <document.json>
 
 Output columns:
 
-* `blockId`
-* `kindCode`
+* `block_id`
+* `kind_code`
 * `textHash`
 * `preview` (bounded, whitespace-collapsed)
 
 Filters:
 
 ```bash
-# Filter by kindCode (repeatable; supports ranges)
+# Filter by kind_code (repeatable; supports ranges)
 bdir inspect document.json --kind 0 --kind 2-10
 
 # Filter by exact block id

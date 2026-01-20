@@ -1,0 +1,46 @@
+{
+  "id": "v001",
+  "title": "Valid patch application (single replace)",
+  "reference": true,
+  "links": [
+    "RFC-0001 §6 (Edit Packet wire format)",
+    "RFC-0001 §8.3 (Validation requirements: exact before match)",
+    "RFC-0001 §9 (Patch application: hash binding, block existence, before match)"
+  ],
+  "context": {
+    "current_page_hash": "0f0e0d0c0b0a0908"
+  },
+  "packet": {
+    "v": 1,
+    "tid": "fixture-v001",
+    "h": "0f0e0d0c0b0a0908",
+    "ha": "sha256",
+    "b": [
+      [
+        "p1",
+        2,
+        "1111222233334444",
+        "This is an example paragraph with a typo teh."
+      ]
+    ]
+  },
+  "patch": {
+    "v": 1,
+    "ops": [
+      {
+        "op": "replace",
+        "block_id": "p1",
+        "before": "teh",
+        "after": "the",
+        "message": "Fix common typo."
+      }
+    ],
+    "h": "0f0e0d0c0b0a0908",
+    "ha": "sha256"
+  },
+  "expect": {
+    "valid": true,
+    "reason": "applies_cleanly",
+    "notes": "The block exists, page hash matches context, and `before` matches exactly once."
+  }
+}

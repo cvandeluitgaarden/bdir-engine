@@ -1,0 +1,47 @@
+{
+  "id": "v009",
+  "title": "Reject hashes shorter than 8 hex chars",
+  "reference": true,
+  "links": [
+    "RFC-0001 §5.1.4 (text_hash truncation semantics: prefix length >= 8)",
+    "RFC-0001 §6.3 (Edit Packet field semantics: h)",
+    "spec/schemas/bdir-edit-packet.ultra-min.v1.schema.json (minLength 8)",
+    "spec/schemas/ai-patch.schema.json (minLength 8)"
+  ],
+  "context": {
+    "current_page_hash": "abcdef0"
+  },
+  "packet": {
+    "v": 1,
+    "tid": "fixture-v009",
+    "h": "abcdef0",
+    "ha": "sha256",
+    "b": [
+      [
+        "p1",
+        2,
+        "1234567",
+        "Hello world."
+      ]
+    ]
+  },
+  "patch": {
+    "v": 1,
+    "ops": [
+      {
+        "op": "replace",
+        "block_id": "p1",
+        "before": "world",
+        "after": "World",
+        "message": "Capitalize for style."
+      }
+    ],
+    "h": "abcdef0",
+    "ha": "sha256"
+  },
+  "expect": {
+    "valid": false,
+    "reason": "hash_too_short",
+    "notes": "Both packet.h and block text_hash are < 8 chars; schema validation should fail and receivers MUST NOT accept such truncation."
+  }
+}
