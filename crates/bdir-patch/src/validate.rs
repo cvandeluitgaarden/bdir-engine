@@ -74,6 +74,12 @@ pub struct ValidateOptions {
     /// will reject patches whose `h` (if present) conflicts with it.
     #[allow(dead_code)]
     pub expected_page_hash: Option<String>,
+
+    /// Require an explicit in-band page-hash binding in the patch (`h` + `ha`).
+    ///
+    /// When true, validators MUST reject patches that omit `h` or `ha`, even if an
+    /// out-of-band `expected_page_hash` is available.
+    pub strict_page_hash_binding: bool,
 }
 
 impl Default for ValidateOptions {
@@ -84,6 +90,7 @@ impl Default for ValidateOptions {
             strict_kind_code: false,
             kind_code_policy: KindCodePolicy::default(),
             expected_page_hash: None,
+            strict_page_hash_binding: false,
         }
     }
 }
@@ -164,6 +171,26 @@ pub fn validate_patch_with_diagnostics(
             "v",
             format!("unsupported patch version {}", patch.v),
         ));
+    }
+
+    // Strict page-hash binding (safety hardening):
+    // In strict mode, a patch MUST carry an explicit in-band binding (`h` + `ha`).
+    if opts.strict_page_hash_binding {
+        if patch.h.is_none() {
+            return Err(err_root(
+                DiagnosticCode::PatchPageHashMissing,
+                "h",
+                "patch is missing required page hash binding (strict): include patch.h and patch.ha".to_string(),
+            ));
+        }
+        let ha = patch.ha.as_deref().unwrap_or("").trim();
+        if ha.is_empty() {
+            return Err(err_root(
+                DiagnosticCode::MissingField,
+                "ha",
+                "patch is missing required hash algorithm binding (strict): include patch.ha".to_string(),
+            ));
+        }
     }
     // Safety binding: ensure the patch is only applied to the intended page version.
     //
@@ -837,8 +864,12 @@ pub fn validate_patch_against_edit_packet_with_diagnostics(
     }
 
     // Default the expected page hash to the edit packet's hash so patches may omit `h`
+
     // when the validator has access to the authoritative packet.
-    if opts.expected_page_hash.is_none() {
+    //
+    // In strict mode, callers can require an explicit in-band binding by setting
+    // `opts.strict_page_hash_binding = true`.
+    if !opts.strict_page_hash_binding && opts.expected_page_hash.is_none() {
         opts.expected_page_hash = Some(packet.h.clone());
     }
 

@@ -100,6 +100,13 @@ enum Command {
         #[arg(long = "expected-page-hash")]
         expected_page_hash: Option<String>,
 
+        /// Require the patch itself to include an in-band page-hash binding (`h` + `ha`).
+        ///
+        /// When enabled, validation will reject patches that omit `h` or `ha`,
+        /// even if `--expected-page-hash` is provided.
+        #[arg(long = "strict-page-hash-binding")]
+        strict_page_hash_binding: bool,
+
         /// Emit PatchTelemetry JSON to stderr (deterministic, machine-readable).
         #[arg(long = "telemetry-json")]
         telemetry_json: bool,
@@ -148,6 +155,13 @@ enum Command {
         /// Expected page-level hash binding when the patch does not include `h`.
         #[arg(long = "expected-page-hash")]
         expected_page_hash: Option<String>,
+
+        /// Require the patch itself to include an in-band page-hash binding (`h` + `ha`).
+        ///
+        /// When enabled, application will reject patches that omit `h` or `ha`,
+        /// even if `--expected-page-hash` is provided.
+        #[arg(long = "strict-page-hash-binding")]
+        strict_page_hash_binding: bool,
 
         /// Emit PatchTelemetry JSON to stderr (deterministic, machine-readable).
         #[arg(long = "telemetry-json")]
@@ -249,6 +263,7 @@ fn main() -> anyhow::Result<()> {
             expected_page_hash,
             diagnostics_json,
             telemetry_json,
+            strict_page_hash_binding
         } => {
             use std::process;
 
@@ -310,6 +325,11 @@ fn main() -> anyhow::Result<()> {
                 opts.expected_page_hash = Some(h);
             }
 
+            if strict_page_hash_binding {
+                opts.strict_page_hash_binding = true;
+            }
+
+
             if strict_kindcode {
                 opts.strict_kind_code = true;
                 if !kindcode_allow.is_empty() {
@@ -365,12 +385,17 @@ fn main() -> anyhow::Result<()> {
             kindcode_allow,
             expected_page_hash,
             telemetry_json,
+            strict_page_hash_binding
         } => {
             use std::process;
 
             let mut opts = patch::ValidateOptions::default();
             if let Some(h) = expected_page_hash.clone() {
                 opts.expected_page_hash = Some(h);
+            }
+
+            if strict_page_hash_binding {
+                opts.strict_page_hash_binding = true;
             }
 
             if strict_kindcode {
