@@ -72,6 +72,7 @@ fn current_wire_types_conform_to_json_schemas() -> Result<()> {
     doc.recompute_hashes();
 
     let packet: EditPacketV1 = bdir_io::editpacket::from_document(&doc, None);
+    let page_hash = doc.page_hash.clone();
     assert_eq!(packet.v, bdir_io::version::EDIT_PACKET_V);
     assert_eq!(packet.ha, "xxh64");
 
@@ -82,8 +83,8 @@ fn current_wire_types_conform_to_json_schemas() -> Result<()> {
     // Patch
     let patch = PatchV1 {
         v: bdir_io::version::PATCH_V,
-        h: None,
-        ha: None,
+        h: Some(page_hash),
+        ha: Some(doc.hash_algorithm.clone()),
         ops: vec![PatchOpV1 {
             op: OpType::Suggest,
             occurrence: None,
