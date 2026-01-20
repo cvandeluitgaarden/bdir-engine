@@ -65,7 +65,7 @@ pub fn apply_patch_against_edit_packet_with_options(
 
                 let current_text = out.b[idx].3.clone();
                 let next_text = match op.occurrence {
-                    Some(Occurrence::Index(n)) => replace_nth_non_overlapping(&current_text, before, after, n)
+                    Some(Occurrence::Index(n)) => replace_nth_non_overlapping(&current_text, before, after, n.try_into().unwrap())
                         .ok_or_else(|| {
                             format!(
                                 "replace occurrence out of range (block_id='{}', occurrence={n})",
@@ -95,7 +95,7 @@ pub fn apply_patch_against_edit_packet_with_options(
                 out.b[idx].3 = match occ {
                     Some(Occurrence::Legacy(DeleteOccurrence::All)) => current_text.replace(before, ""),
                     Some(Occurrence::Legacy(DeleteOccurrence::First)) => delete_first(&current_text, before),
-                    Some(Occurrence::Index(n)) => delete_nth_non_overlapping(&current_text, before, n).ok_or_else(|| {
+                    Some(Occurrence::Index(n)) => delete_nth_non_overlapping(&current_text, before, n.try_into().unwrap()).ok_or_else(|| {
                         format!(
                             "delete occurrence out of range (block_id='{}', occurrence={n})",
                             op.block_id
@@ -171,7 +171,7 @@ pub fn apply_patch_against_document(doc: &Document, patch: &PatchV1) -> Result<D
 
                 let current_text = out.blocks[idx].text.clone();
                 out.blocks[idx].text = match op.occurrence {
-                    Some(Occurrence::Index(n)) => replace_nth_non_overlapping(&current_text, before, after, n)
+                    Some(Occurrence::Index(n)) => replace_nth_non_overlapping(&current_text, before, after, n.try_into().unwrap())
                         .ok_or_else(|| {
                             format!(
                                 "replace occurrence out of range (block_id='{}', occurrence={n})",
@@ -200,7 +200,7 @@ pub fn apply_patch_against_document(doc: &Document, patch: &PatchV1) -> Result<D
                 out.blocks[idx].text = match occ {
                     Some(Occurrence::Legacy(DeleteOccurrence::All)) => current_text.replace(before, ""),
                     Some(Occurrence::Legacy(DeleteOccurrence::First)) => delete_first(&current_text, before),
-                    Some(Occurrence::Index(n)) => delete_nth_non_overlapping(&current_text, before, n).ok_or_else(|| {
+                    Some(Occurrence::Index(n)) => delete_nth_non_overlapping(&current_text, before, n.try_into().unwrap()).ok_or_else(|| {
                         format!(
                             "delete occurrence out of range (block_id='{}', occurrence={n})",
                             op.block_id
@@ -448,4 +448,40 @@ pub fn apply_patch_against_document_with_telemetry(
     };
 
     (res, tel)
+}
+
+/// Replace the Nth non-overlapping occurrence (1-indexed) of `before` with `after`.
+/// Returns None if the Nth occurrence does not exist.
+pub fn replace_nth_non_overlapping(haystack: &str, before: &str, after: &str, n: usize) -> Option<String> {
+    if before.is_empty() || n == 0 {
+        return None;
+    }
+
+    let mut start = 0usize;
+    let mut count = 0usize;
+
+    while let Some(rel) = haystack[start..].find(before) {
+        let idx = start + rel;
+        count += 1;
+
+        if count == n {
+            let mut out = String::with_capacity(haystack.len() - before.len() + after.len());
+            out.push_str(&haystack[..idx]);
+            out.push_str(after);
+            out.push_str(&haystack[idx + before.len()..]);
+            return Some(out);
+        }
+
+        // Non-overlapping: jump past this match
+        start = idx + before.len();
+        if start > haystack.len() {
+            break;
+        }
+    }
+
+    None
+}
+
+pub fn delete_nth_non_overlapping(haystack: &str, before: &str, n: usize) -> Option<String> {
+    replace_nth_non_overlapping(haystack, before, "", n)
 }
