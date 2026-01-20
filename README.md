@@ -32,6 +32,7 @@ For current engine support, known gaps, and planned work, see:
 
 ---
 
+
 ## What is BDIR?
 
 BDIR (Block-based Document Intermediate Representation) represents a document as an ordered list of semantic blocks, each with:
@@ -62,6 +63,8 @@ Compatibility note: this engine accepts legacy Patch v1 JSON that uses `blockId`
 but **serializes** the canonical RFC field name `block_id`.
 
 See RFC-0001 "Edit Packet" (Section 6) and "Patch Instructions" (Section 8) for the normative wire formats.
+
+Compatibility note: for Patch v1 operation targeting, this engine **serializes** `block_id` and **also accepts** legacy `blockId` when parsing patches.
 
 ### Required top-level Document fields
 
@@ -95,6 +98,7 @@ Minimal example:
 ```
 
 Note: when `text_hash` and/or `page_hash` are missing or empty, tools in this repo may recompute them deterministically.
+
 
 ## Components
 
@@ -132,7 +136,7 @@ Output columns:
 
 * `block_id`
 * `kind_code`
-* `textHash`
+* `text_hash`
 * `preview` (bounded, whitespace-collapsed)
 
 Filters:
@@ -201,3 +205,10 @@ Contributions are welcome, especially:
 - documentation and examples
 
 If you’re proposing protocol changes, please open an issue in the `bdir-spec` repository first.
+
+## Development & Release
+
+- Branch model: `docs/branching-and-release.md`
+- SemVer policy: `docs/semver-policy.md`
+- Branch protection: `.github/rulesets/` (example JSON) and `.github/ci-required-checks.md`
+- PR checklist: `.github/pull_request_template.md`

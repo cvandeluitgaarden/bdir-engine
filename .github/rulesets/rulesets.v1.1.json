@@ -1,0 +1,146 @@
+[
+  {
+    "name": "Protect main",
+    "target": "branch",
+    "enforcement": "active",
+    "conditions": {
+      "ref_name": {
+        "include": [
+          "refs/heads/main"
+        ],
+        "exclude": []
+      }
+    },
+    "rules": [
+      {
+        "type": "pull_request",
+        "parameters": {
+          "dismiss_stale_reviews_on_push": true,
+          "require_code_owner_review": false,
+          "required_approving_review_count": 1,
+          "require_last_push_approval": false,
+          "required_review_thread_resolution": true
+        }
+      },
+      {
+        "type": "required_status_checks",
+        "parameters": {
+          "strict_required_status_checks_policy": true,
+          "required_status_checks": [
+            {
+              "context": "CI / test"
+            },
+            {
+              "context": "CI / protocol-guard"
+            },
+            {
+              "context": "CI / rfc-guard"
+            }
+          ]
+        }
+      },
+      {
+        "type": "non_fast_forward"
+      },
+      {
+        "type": "deletion"
+      }
+    ]
+  },
+  {
+    "name": "Protect release/*",
+    "target": "branch",
+    "enforcement": "active",
+    "conditions": {
+      "ref_name": {
+        "include": [
+          "refs/heads/release/*"
+        ],
+        "exclude": []
+      }
+    },
+    "rules": [
+      {
+        "type": "pull_request",
+        "parameters": {
+          "dismiss_stale_reviews_on_push": true,
+          "require_code_owner_review": false,
+          "required_approving_review_count": 1,
+          "require_last_push_approval": false,
+          "required_review_thread_resolution": true
+        }
+      },
+      {
+        "type": "required_status_checks",
+        "parameters": {
+          "strict_required_status_checks_policy": true,
+          "required_status_checks": [
+            {
+              "context": "CI / test"
+            },
+            {
+              "context": "CI / protocol-guard"
+            },
+            {
+              "context": "CI / rfc-guard"
+            }
+          ]
+        }
+      },
+      {
+        "type": "non_fast_forward"
+      },
+      {
+        "type": "deletion"
+      }
+    ]
+  },
+  {
+    "name": "Protect develop/1.1",
+    "target": "branch",
+    "enforcement": "active",
+    "conditions": {
+      "ref_name": {
+        "include": [
+          "refs/heads/develop/1.1"
+        ],
+        "exclude": []
+      }
+    },
+    "rules": [
+      {
+        "type": "pull_request",
+        "parameters": {
+          "dismiss_stale_reviews_on_push": true,
+          "require_code_owner_review": false,
+          "required_approving_review_count": 1,
+          "require_last_push_approval": false,
+          "required_review_thread_resolution": true
+        }
+      },
+      {
+        "type": "required_status_checks",
+        "parameters": {
+          "strict_required_status_checks_policy": true,
+          "required_status_checks": [
+            {
+              "context": "CI / test"
+            },
+            {
+              "context": "CI / protocol-guard"
+            },
+            {
+              "context": "CI / rfc-guard"
+            }
+          ]
+        }
+      },
+      {
+        "type": "non_fast_forward"
+      },
+      {
+        "type": "deletion"
+      }
+    ]
+  }
+]
