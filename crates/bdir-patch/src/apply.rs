@@ -6,7 +6,7 @@ use crate::validate::{
     validate_patch_against_edit_packet_with_options,
     ValidateOptions,
 };
-use bdir_core::hash::{hash_canon_hex, hash_hex};
+use bdir_core::hash::{hash_canon_hex, hash_hex, normalize_nfc};
 use bdir_core::model::{Block, Document};
 use bdir_editpacket::{BlockTupleV1, EditPacketV1};
 
@@ -98,7 +98,11 @@ pub fn apply_patch_against_edit_packet_with_options(
 
                 let current_text = out.b[idx].3.clone();
                 out.b[idx].3 = match occ {
-                    Some(Occurrence::Legacy(DeleteOccurrence::All)) => current_text.replace(before, ""),
+                    Some(Occurrence::Legacy(DeleteOccurrence::All)) => {
+                        let hay = normalize_nfc(&current_text);
+                        let needle = normalize_nfc(before);
+                        hay.replace(&needle, "")
+                    },
                     Some(Occurrence::Legacy(DeleteOccurrence::First)) => delete_first(&current_text, before),
                     Some(Occurrence::Index(n)) => {
                         let n = usize::try_from(n)
@@ -145,7 +149,7 @@ pub fn apply_patch_against_edit_packet_with_options(
                     new_block_id.to_string(),
                     kind_code,
                     String::new(),
-                    text.to_string(),
+                    normalize_nfc(text),
                 );
 
                 out.b.insert(anchor_idx + 1, new_tuple);
@@ -228,7 +232,11 @@ pub fn apply_patch_against_document(doc: &Document, patch: &PatchV1) -> Result<D
 
                 let current_text = out.blocks[idx].text.clone();
                 out.blocks[idx].text = match occ {
-                    Some(Occurrence::Legacy(DeleteOccurrence::All)) => current_text.replace(before, ""),
+                    Some(Occurrence::Legacy(DeleteOccurrence::All)) => {
+                        let hay = normalize_nfc(&current_text);
+                        let needle = normalize_nfc(before);
+                        hay.replace(&needle, "")
+                    },
                     Some(Occurrence::Legacy(DeleteOccurrence::First)) => delete_first(&current_text, before),
                     Some(Occurrence::Index(n)) => { 
                         let n = usize::try_from(n)
@@ -274,7 +282,7 @@ pub fn apply_patch_against_document(doc: &Document, patch: &PatchV1) -> Result<D
                     id: new_block_id.to_string(),
                     kind_code,
                     text_hash: String::new(),
-                    text: text.to_string(),
+                    text: normalize_nfc(text),
                 };
 
                 out.blocks.insert(anchor_idx + 1, new_block);
@@ -312,25 +320,30 @@ fn find_doc_block_index(blocks: &[Block], block_id: &str) -> Option<usize> {
 
 /// Replace only the FIRST occurrence (deterministic).
 fn replace_first(haystack: &str, needle: &str, replacement: &str) -> String {
+    // RFC-0001 §2.2: matching and inserted strings are NFC-normalized.
+    let haystack = normalize_nfc(haystack);
+    let needle = normalize_nfc(needle);
+    let replacement = normalize_nfc(replacement);
+
     if needle.is_empty() {
-        return haystack.to_string();
+        return haystack;
     }
 
-    match haystack.find(needle) {
-        None => haystack.to_string(),
+    match haystack.find(&needle) {
+        None => haystack,
         Some(pos) => {
             let mut out = String::with_capacity(
                 haystack.len().saturating_sub(needle.len()) + replacement.len(),
             );
             out.push_str(&haystack[..pos]);
-            out.push_str(replacement);
+            out.push_str(&replacement);
             out.push_str(&haystack[pos + needle.len()..]);
             out
         }
     }
 }
 
-/// Delete only the FIRST occurrence (deterministic).
+/// Delete only the FIRST occurrence (deterministic). (deterministic).
 fn delete_first(haystack: &str, needle: &str) -> String {
     replace_first(haystack, needle, "")
 }
@@ -468,7 +481,17 @@ pub fn apply_patch_against_document_with_telemetry(
 
 /// Replace the Nth non-overlapping occurrence (1-indexed) of `before` with `after`.
 /// Returns None if the Nth occurrence does not exist.
-pub fn replace_nth_non_overlapping(haystack: &str, before: &str, after: &str, n: usize) -> Option<String> {
+pub fn replace_nth_non_overlapping(
+    haystack: &str,
+    before: &str,
+    after: &str,
+    n: usize,
+) -> Option<String> {
+    // RFC-0001 §2.2: matching and inserted strings are NFC-normalized.
+    let haystack = normalize_nfc(haystack);
+    let before = normalize_nfc(before);
+    let after = normalize_nfc(after);
+
     if before.is_empty() || n == 0 {
         return None;
     }
@@ -476,14 +499,14 @@ pub fn replace_nth_non_overlapping(haystack: &str, before: &str, after: &str, n:
     let mut start = 0usize;
     let mut count = 0usize;
 
-    while let Some(rel) = haystack[start..].find(before) {
+    while let Some(rel) = haystack[start..].find(&before) {
         let idx = start + rel;
         count += 1;
 
         if count == n {
             let mut out = String::with_capacity(haystack.len() - before.len() + after.len());
             out.push_str(&haystack[..idx]);
-            out.push_str(after);
+            out.push_str(&after);
             out.push_str(&haystack[idx + before.len()..]);
             return Some(out);
         }

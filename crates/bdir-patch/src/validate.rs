@@ -1,4 +1,5 @@
 use bdir_core::model::Document;
+use bdir_core::hash::normalize_nfc;
 
 use crate::{
     EditPacketV1,
@@ -639,13 +640,17 @@ pub fn validate_patch_with_diagnostics(
 ///
 /// This is used for ambiguity detection and occurrence range validation.
 fn count_non_overlapping(haystack: &str, needle: &str) -> usize {
+    // RFC-0001 §2.2: substring matching is performed over NFC-normalized strings.
+    let haystack = normalize_nfc(haystack);
+    let needle = normalize_nfc(needle);
+
     if needle.is_empty() {
         return 0;
     }
 
     let mut count = 0usize;
     let mut start = 0usize;
-    while let Some(pos) = haystack[start..].find(needle) {
+    while let Some(pos) = haystack[start..].find(&needle) {
         count += 1;
         start += pos + needle.len();
         if start >= haystack.len() {
@@ -663,7 +668,10 @@ fn guard_before_diag(
     before: &str,
     min_before_len: usize,
 ) -> Result<(), ValidationError> {
-    if before.trim().is_empty() {
+    // RFC-0001 §2.2: operation strings are NFC-normalized.
+    let before_nfc = normalize_nfc(before);
+
+    if before_nfc.trim().is_empty() {
         return Err(err_op(
             DiagnosticCode::BeforeEmpty,
             op_index,
@@ -675,7 +683,7 @@ fn guard_before_diag(
     }
 
     // Use char count to avoid surprising behavior with non-ASCII input.
-    if before.chars().count() < min_before_len {
+    if before_nfc.chars().count() < min_before_len {
         return Err(err_op(
             DiagnosticCode::BeforeTooShort,
             op_index,

@@ -1,5 +1,6 @@
 use xxhash_rust::xxh3::xxh3_64;
 use sha2::{Digest, Sha256};
+use unicode_normalization::UnicodeNormalization;
 
 /// Canonicalize text for hashing.
 ///
@@ -30,7 +31,15 @@ pub fn canonicalize_text(input: &str) -> String {
         }
     }
 
-    out
+    // Unicode NFC normalization (RFC-0001 §2.2)
+    out.nfc().collect()
+}
+
+/// Normalize a string to Unicode NFC.
+///
+/// This helper is used for deterministic hashing and substring matching.
+pub fn normalize_nfc(input: &str) -> String {
+    input.nfc().collect()
 }
 
 /// Compute an xxh64-style hash (hex) over UTF-8 bytes.
