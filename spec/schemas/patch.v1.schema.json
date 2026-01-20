@@ -1,118 +1,158 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "bdir://schemas/patch.v1",
+  "$id": "https://example.com/bdir/patch.v1.schema.json",
   "title": "BDIR Patch v1",
+  "description": "Normative schema for BDIR Patch Protocol v1 (RFC-0001).",
   "type": "object",
-  "required": ["v", "ops"],
   "additionalProperties": false,
+
+  "required": ["v", "h", "ops"],
+
   "properties": {
-    "v": { "type": "integer", "const": 1 },
-    "h": { "type": "string", "minLength": 1 },
-    "ha": { "type": "string", "minLength": 1 },
+    "v": {
+      "type": "integer",
+      "const": 1,
+      "description": "Patch protocol version."
+    },
+
+    "h": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Page-level content hash binding."
+    },
+
+    "ha": {
+      "type": "string",
+      "minLength": 1,
+      "default": "sha256",
+      "description": "Hash algorithm identifier (defaults to sha256)."
+    },
+
     "ops": {
       "type": "array",
-      "items": { "$ref": "#/definitions/op" }
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/operation" }
     }
   },
-  "definitions": {
-    "op": {
+
+  "$defs": {
+    "block_id": {
+      "type": "string",
+      "minLength": 1
+    },
+
+    "kind_code": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 99
+    },
+
+    "operation": {
       "type": "object",
-      "required": ["op"],
       "additionalProperties": false,
+      "required": ["op"],
+
       "properties": {
         "op": {
           "type": "string",
           "enum": ["replace", "delete", "insert_after", "suggest"]
-        },
-        "block_id": { "type": "string", "minLength": 1 },
-        "blockId": { "type": "string", "minLength": 1 },
-        "before": { "type": "string" },
-        "after": { "type": "string" },
-        "occurrence": {
-          "description": "1-indexed occurrence selector. Legacy delete-only string values ('first'/'all') are accepted for backwards compatibility.",
-          "anyOf": [
-            { "type": "integer", "minimum": 1 },
-            { "type": "string", "enum": ["first", "all"] }
-          ]
-        },
-        "content": { "type": "string" },
-        "new_block_id": { "type": "string", "minLength": 1 },
-        "newBlockId": { "type": "string", "minLength": 1 },
-        "kind_code": { "type": "string", "minLength": 1 },
-        "kindCode": { "type": "string", "minLength": 1 },
-        "text": { "type": "string" },
-        "severity": { "type": "string", "enum": ["low", "medium", "high"] },
-        "message": { "type": "string" }
+        }
       },
+
       "allOf": [
         {
-          "oneOf": [
-            { "required": ["block_id"], "not": { "required": ["blockId"] } },
-            { "required": ["blockId"], "not": { "required": ["block_id"] } }
-          ]
-        },
-        {
-          "if": { "properties": { "op": { "const": "replace" } } },
+          "if": {
+            "properties": { "op": { "const": "replace" } }
+          },
           "then": {
-            "required": ["before", "after"],
+            "required": ["block_id", "before", "after"],
             "properties": {
-              "occurrence": { "type": "integer", "minimum": 1 }
+              "block_id": { "$ref": "#/$defs/block_id" },
+              "blockId": { "$ref": "#/$defs/block_id" },
+
+              "before": { "type": "string", "minLength": 1 },
+              "after": { "type": "string" },
+
+              "occurrence": {
+                "type": "integer",
+                "minimum": 1
+              }
             }
           }
         },
+
         {
-          "if": { "properties": { "op": { "const": "delete" } } },
-          "then": { "required": ["before"] }
-        },
-        {
-          "if": { "properties": { "op": { "const": "insert_after" } } },
+          "if": {
+            "properties": { "op": { "const": "delete" } }
+          },
           "then": {
-            "allOf": [
-              {
-                "oneOf": [
-                  { "required": ["new_block_id"], "not": { "required": ["newBlockId"] } },
-                  { "required": ["newBlockId"], "not": { "required": ["new_block_id"] } }
-                ]
-              },
-              {
-                "oneOf": [
-                  { "required": ["kind_code"], "not": { "required": ["kindCode"] } },
-                  { "required": ["kindCode"], "not": { "required": ["kind_code"] } }
-                ]
-              },
-              {
-                "oneOf": [
-                  { "required": ["text"], "not": { "required": ["content"] } },
-                  { "required": ["content"], "not": { "required": ["text"] } }
-                ]
+            "required": ["block_id", "before"],
+            "properties": {
+              "block_id": { "$ref": "#/$defs/block_id" },
+              "blockId": { "$ref": "#/$defs/block_id" },
+
+              "before": { "type": "string", "minLength": 1 },
+
+              "occurrence": {
+                "type": "integer",
+                "minimum": 1
               }
-            ],
+            }
+          }
+        },
+
+        {
+          "if": {
+            "properties": { "op": { "const": "insert_after" } }
+          },
+          "then": {
+            "required": ["block_id", "new_block_id", "kind_code", "text"],
+            "properties": {
+              "block_id": { "$ref": "#/$defs/block_id" },
+              "blockId": { "$ref": "#/$defs/block_id" },
+
+              "new_block_id": { "$ref": "#/$defs/block_id" },
+              "newBlockId": { "$ref": "#/$defs/block_id" },
+
+              "kind_code": { "$ref": "#/$defs/kind_code" },
+              "kindCode": { "$ref": "#/$defs/kind_code" },
+
+              "text": { "type": "string" },
+              "content": { "type": "string" }
+            },
             "not": {
               "anyOf": [
                 { "required": ["before"] },
-                { "required": ["after"] },
-                { "required": ["message"] },
-                { "required": ["occurrence"] },
-                { "required": ["severity"] }
+                { "required": ["after"] }
               ]
             }
           }
         },
+
         {
-          "if": { "properties": { "op": { "const": "suggest" } } },
+          "if": {
+            "properties": { "op": { "const": "suggest" } }
+          },
           "then": {
-            "required": ["message"],
+            "required": ["block_id", "message"],
+            "properties": {
+              "block_id": { "$ref": "#/$defs/block_id" },
+              "blockId": { "$ref": "#/$defs/block_id" },
+
+              "message": {
+                "type": "string",
+                "minLength": 1
+              },
+
+              "severity": {
+                "type": "string",
+                "enum": ["low", "medium", "high"]
+              }
+            },
             "not": {
               "anyOf": [
                 { "required": ["before"] },
-                { "required": ["after"] },
-                { "required": ["content"] },
-                { "required": ["text"] },
-                { "required": ["new_block_id"] },
-                { "required": ["newBlockId"] },
-                { "required": ["kind_code"] },
-                { "required": ["kindCode"] },
-                { "required": ["occurrence"] }
+                { "required": ["after"] }
               ]
             }
           }
