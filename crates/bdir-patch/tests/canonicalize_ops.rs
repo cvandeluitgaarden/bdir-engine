@@ -1,7 +1,7 @@
 use bdir_patch::{
     canonicalize_patch_ops,
     canonicalize_patch_ops_against_edit_packet,
-    schema::{DeleteOccurrence, OpType, PatchOpV1, PatchV1},
+    schema::{DeleteOccurrence, Occurrence, OpType, PatchOpV1, PatchV1},
     EditPacketV1,
 };
 
@@ -79,15 +79,15 @@ fn canonicalize_prefers_edit_packet_block_order() {
 fn canonicalize_orders_delete_occurrence_first_then_all() {
     let mut o1 = op(OpType::Delete, "p1");
     o1.before = Some("x".to_string());
-    o1.occurrence = Some(DeleteOccurrence::All);
+    o1.occurrence = Some(Occurrence::Legacy(DeleteOccurrence::All));
 
     let mut o2 = op(OpType::Delete, "p1");
     o2.before = Some("x".to_string());
-    o2.occurrence = Some(DeleteOccurrence::First);
+    o2.occurrence = Some(Occurrence::Legacy(DeleteOccurrence::First));
 
     let mut patch = mk_patch(vec![o1, o2]);
     canonicalize_patch_ops(&mut patch);
 
-    assert_eq!(patch.ops[0].occurrence, Some(DeleteOccurrence::First));
-    assert_eq!(patch.ops[1].occurrence, Some(DeleteOccurrence::All));
+    assert_eq!(patch.ops[0].occurrence, Some(Occurrence::Legacy(DeleteOccurrence::First)));
+    assert_eq!(patch.ops[1].occurrence, Some(Occurrence::Legacy(DeleteOccurrence::All)));
 }

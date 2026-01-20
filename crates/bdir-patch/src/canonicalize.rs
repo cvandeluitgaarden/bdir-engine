@@ -9,7 +9,7 @@ use std::collections::HashMap;
 
 use bdir_editpacket::EditPacketV1;
 
-use crate::schema::{DeleteOccurrence, OpType, PatchOpV1, PatchV1};
+use crate::schema::{DeleteOccurrence, Occurrence, OpType, PatchOpV1, PatchV1};
 
 /// Options for canonicalizing patch operation ordering.
 #[derive(Debug, Clone, Copy)]
@@ -58,10 +58,14 @@ fn op_rank(op: OpType) -> i32 {
     }
 }
 
-fn occurrence_rank(o: DeleteOccurrence) -> i32 {
+fn occurrence_rank(o: Option<Occurrence>) -> i64 {
     match o {
-        DeleteOccurrence::First => 0,
-        DeleteOccurrence::All => 1,
+        // Canonical RFC form: 1-indexed.
+        Some(Occurrence::Index(n)) => n as i64,
+        // Legacy delete forms: keep deterministic ordering.
+        Some(Occurrence::Legacy(DeleteOccurrence::First)) => 1,
+        Some(Occurrence::Legacy(DeleteOccurrence::All)) => i64::MAX - 1,
+        None => i64::MAX,
     }
 }
 
@@ -86,7 +90,7 @@ fn canonicalize_ops_inner(ops: &mut Vec<PatchOpV1>, order: Option<&HashMap<&str,
                     after: op.after.clone().unwrap_or_default(),
                     content: op.content.clone().unwrap_or_default(),
                     message: op.message.clone().unwrap_or_default(),
-                    occurrence_rank: op.occurrence.map(occurrence_rank).unwrap_or(occurrence_rank(DeleteOccurrence::All)),
+                    occurrence_rank: occurrence_rank(op.occurrence),
                 },
             )
         })
@@ -112,7 +116,7 @@ struct CanonicalKey {
     after: String,
     content: String,
     message: String,
-    occurrence_rank: i32,
+    occurrence_rank: i64,
 }
 
 impl Ord for CanonicalKey {

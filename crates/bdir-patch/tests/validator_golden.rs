@@ -57,14 +57,33 @@ fn before_not_found_fails_with_stable_message() {
 }
 
 #[test]
-fn delete_missing_occurrence_defaults_to_all_for_compat() {
+fn delete_missing_occurrence_is_allowed_when_unambiguous() {
     let doc = load_doc();
     let patch = load_patch("patch.delete_missing_occurrence.json");
 
-    // Interop: for v1 compatibility, occurrence is optional for delete.
-    // When omitted, consumers should treat it as "all".
+    // RFC-0001 v1.0.2: `occurrence` is optional and only required when `before`
+    // matches multiple times within the block.
     let opts = ValidateOptions { expected_page_hash: Some(doc.page_hash.clone()), ..ValidateOptions::default() };
-    validate_patch_with_options(&doc, &patch, opts).expect("missing occurrence should be accepted");
+    validate_patch_with_options(&doc, &patch, opts).expect("missing occurrence should be accepted when unambiguous");
+}
+
+#[test]
+fn delete_without_occurrence_is_rejected_when_ambiguous() {
+    let mut doc = load_doc();
+    // Make the match ambiguous.
+    doc.blocks.iter_mut().find(|b| b.id == "p1").unwrap().text = "DELETE_ME DELETE_ME".to_string();
+    doc.recompute_hashes();
+
+    let patch: PatchV1 = serde_json::from_value(serde_json::json!({
+        "v": 1,
+        "ops": [
+            { "op": "delete", "block_id": "p1", "before": "DELETE_ME" }
+        ]
+    })).unwrap();
+
+    let opts = ValidateOptions { expected_page_hash: Some(doc.page_hash.clone()), ..ValidateOptions::default() };
+    let err = validate_patch_with_options(&doc, &patch, opts).unwrap_err();
+    assert!(err.contains("ambiguous"));
 }
 
 #[test]

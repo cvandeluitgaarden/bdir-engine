@@ -2,7 +2,10 @@ use bdir_core::model::Document;
 use bdir_codebook as codebook;
 
 use crate::{
-    EditPacketV1, PatchTelemetry, diagnostics::{DiagnosticCode, ValidationDiagnostic, ValidationError}, schema::{DeleteOccurrence, OpType, PatchV1}
+    EditPacketV1,
+    PatchTelemetry,
+    diagnostics::{DiagnosticCode, ValidationDiagnostic, ValidationError},
+    schema::{DeleteOccurrence, Occurrence, OpType, PatchV1},
 };
 
 /// kindCode enforcement policy.
@@ -224,16 +227,6 @@ pub fn validate_patch_with_diagnostics(
 
         match op.op {
             OpType::Replace => {
-                if op.occurrence.is_some() {
-                    return Err(err_op(
-                        DiagnosticCode::UnexpectedField,
-                        i,
-                        op.op,
-                        Some(op.block_id.clone()),
-                        Some(format!("ops[{i}].occurrence")),
-                        format!("ops[{i}] (replace) unexpected occurrence (only valid for delete)"),
-                    ));
-                }
                 let before = op.before.as_deref().ok_or_else(|| {
                     err_op(
                         DiagnosticCode::MissingField,
@@ -256,7 +249,8 @@ pub fn validate_patch_with_diagnostics(
                 })?;
 
                 guard_before_diag(i, op.op, &op.block_id, before, opts.min_before_len)?;
-                if !block.text.contains(before) {
+                let matches = count_non_overlapping(&block.text, before);
+                if matches == 0 {
                     return Err(err_op(
                         DiagnosticCode::BeforeNotFound,
                         i,
@@ -268,6 +262,54 @@ pub fn validate_patch_with_diagnostics(
                             op.block_id
                         ),
                     ));
+                }
+
+                // Ambiguity handling (RFC-0001 v1.0.2):
+                // - If multiple matches exist and `occurrence` is omitted, reject.
+                // - If `occurrence` is present, it must be a 1-indexed integer within range.
+                match op.occurrence {
+                    None => {
+                        if matches > 1 {
+                            return Err(err_op(
+                                DiagnosticCode::BeforeAmbiguous,
+                                i,
+                                op.op,
+                                Some(op.block_id.clone()),
+                                Some(format!("ops[{i}].before")),
+                                format!(
+                                    "ops[{i}] (replace) before substring is ambiguous in block '{}' (matches {matches} times); provide occurrence",
+                                    op.block_id
+                                ),
+                            ));
+                        }
+                    }
+                    Some(Occurrence::Index(n)) => {
+                        if n == 0 || (n as usize) > matches {
+                            return Err(err_op(
+                                DiagnosticCode::OccurrenceOutOfRange,
+                                i,
+                                op.op,
+                                Some(op.block_id.clone()),
+                                Some(format!("ops[{i}].occurrence")),
+                                format!(
+                                    "ops[{i}] (replace) occurrence out of range for block '{}' (occurrence={n}, matches={matches})",
+                                    op.block_id
+                                ),
+                            ));
+                        }
+                    }
+                    Some(Occurrence::Legacy(_)) => {
+                        return Err(err_op(
+                            DiagnosticCode::UnexpectedField,
+                            i,
+                            op.op,
+                            Some(op.block_id.clone()),
+                            Some(format!("ops[{i}].occurrence")),
+                            format!(
+                                "ops[{i}] (replace) invalid occurrence value (legacy string values are delete-only; use integer occurrence)",
+                            ),
+                        ));
+                    }
                 }
             }
 
@@ -283,14 +325,10 @@ pub fn validate_patch_with_diagnostics(
                     )
                 })?;
 
-                let occ = op.occurrence.unwrap_or(DeleteOccurrence::All);
-
-                let _ = match occ {
-                    DeleteOccurrence::First | DeleteOccurrence::All => occ,
-                };
+                let matches = count_non_overlapping(&block.text, before);
 
                 guard_before_diag(i, op.op, &op.block_id, before, opts.min_before_len)?;
-                if !block.text.contains(before) {
+                if matches == 0 {
                     return Err(err_op(
                         DiagnosticCode::BeforeNotFound,
                         i,
@@ -302,6 +340,42 @@ pub fn validate_patch_with_diagnostics(
                             op.block_id
                         ),
                     ));
+                }
+
+                match op.occurrence {
+                    None => {
+                        if matches > 1 {
+                            return Err(err_op(
+                                DiagnosticCode::BeforeAmbiguous,
+                                i,
+                                op.op,
+                                Some(op.block_id.clone()),
+                                Some(format!("ops[{i}].before")),
+                                format!(
+                                    "ops[{i}] (delete) before substring is ambiguous in block '{}' (matches {matches} times); provide occurrence",
+                                    op.block_id
+                                ),
+                            ));
+                        }
+                    }
+                    Some(Occurrence::Index(n)) => {
+                        if n == 0 || (n as usize) > matches {
+                            return Err(err_op(
+                                DiagnosticCode::OccurrenceOutOfRange,
+                                i,
+                                op.op,
+                                Some(op.block_id.clone()),
+                                Some(format!("ops[{i}].occurrence")),
+                                format!(
+                                    "ops[{i}] (delete) occurrence out of range for block '{}' (occurrence={n}, matches={matches})",
+                                    op.block_id
+                                ),
+                            ));
+                        }
+                    }
+                    // Legacy delete semantics are accepted for backwards compatibility.
+                    Some(Occurrence::Legacy(DeleteOccurrence::First)) => {}
+                    Some(Occurrence::Legacy(DeleteOccurrence::All)) => {}
                 }
             }
 
@@ -484,6 +558,25 @@ fn guard_before_diag(
     Ok(())
 }
 
+/// Count non-overlapping occurrences of `needle` in `haystack`, scanning left-to-right.
+///
+/// This matches RFC-0001 v1.0.2 occurrence semantics.
+fn count_non_overlapping(haystack: &str, needle: &str) -> usize {
+    if needle.is_empty() {
+        return 0;
+    }
+    let mut count = 0usize;
+    let mut offset = 0usize;
+    while let Some(pos) = haystack[offset..].find(needle) {
+        count += 1;
+        offset += pos + needle.len();
+        if offset >= haystack.len() {
+            break;
+        }
+    }
+    count
+}
+
 pub fn validate_patch_against_edit_packet(packet: &EditPacketV1, patch: &PatchV1) -> Result<(), String> {
     validate_patch_against_edit_packet_with_options(packet, patch, ValidateOptions::default())
 }
@@ -600,16 +693,6 @@ pub fn validate_patch_against_edit_packet_with_diagnostics(
 
         match op.op {
             OpType::Replace => {
-                if op.occurrence.is_some() {
-                    return Err(err_op(
-                        DiagnosticCode::UnexpectedField,
-                        i,
-                        op.op,
-                        Some(op.block_id.clone()),
-                        Some(format!("ops[{i}].occurrence")),
-                        format!("ops[{i}] (replace) unexpected occurrence (only valid for delete)"),
-                    ));
-                }
                 let before = op.before.as_deref().ok_or_else(|| {
                     err_op(
                         DiagnosticCode::MissingField,
@@ -632,7 +715,8 @@ pub fn validate_patch_against_edit_packet_with_diagnostics(
                 })?;
 
                 guard_before_diag(i, op.op, &op.block_id, before, opts.min_before_len)?;
-                if !block_text.contains(before) {
+                let matches = count_non_overlapping(block_text, before);
+                if matches == 0 {
                     return Err(err_op(
                         DiagnosticCode::BeforeNotFound,
                         i,
@@ -644,6 +728,51 @@ pub fn validate_patch_against_edit_packet_with_diagnostics(
                             op.block_id
                         ),
                     ));
+                }
+
+                match op.occurrence {
+                    None => {
+                        if matches > 1 {
+                            return Err(err_op(
+                                DiagnosticCode::BeforeAmbiguous,
+                                i,
+                                op.op,
+                                Some(op.block_id.clone()),
+                                Some(format!("ops[{i}].before")),
+                                format!(
+                                    "ops[{i}] (replace) before substring is ambiguous in block '{}' (matches {matches} times); provide occurrence",
+                                    op.block_id
+                                ),
+                            ));
+                        }
+                    }
+                    Some(Occurrence::Index(n)) => {
+                        if n == 0 || (n as usize) > matches {
+                            return Err(err_op(
+                                DiagnosticCode::OccurrenceOutOfRange,
+                                i,
+                                op.op,
+                                Some(op.block_id.clone()),
+                                Some(format!("ops[{i}].occurrence")),
+                                format!(
+                                    "ops[{i}] (replace) occurrence out of range for block '{}' (occurrence={n}, matches={matches})",
+                                    op.block_id
+                                ),
+                            ));
+                        }
+                    }
+                    Some(Occurrence::Legacy(_)) => {
+                        return Err(err_op(
+                            DiagnosticCode::UnexpectedField,
+                            i,
+                            op.op,
+                            Some(op.block_id.clone()),
+                            Some(format!("ops[{i}].occurrence")),
+                            format!(
+                                "ops[{i}] (replace) invalid occurrence value (legacy string values are delete-only; use integer occurrence)",
+                            ),
+                        ));
+                    }
                 }
             }
 
@@ -659,14 +788,9 @@ pub fn validate_patch_against_edit_packet_with_diagnostics(
                     )
                 })?;
 
-                let occ = op.occurrence.unwrap_or(DeleteOccurrence::All);
-
-                let _ = match occ {
-                    DeleteOccurrence::First | DeleteOccurrence::All => occ,
-                };
-
                 guard_before_diag(i, op.op, &op.block_id, before, opts.min_before_len)?;
-                if !block_text.contains(before) {
+                let matches = count_non_overlapping(block_text, before);
+                if matches == 0 {
                     return Err(err_op(
                         DiagnosticCode::BeforeNotFound,
                         i,
@@ -678,6 +802,41 @@ pub fn validate_patch_against_edit_packet_with_diagnostics(
                             op.block_id
                         ),
                     ));
+                }
+
+                match op.occurrence {
+                    None => {
+                        if matches > 1 {
+                            return Err(err_op(
+                                DiagnosticCode::BeforeAmbiguous,
+                                i,
+                                op.op,
+                                Some(op.block_id.clone()),
+                                Some(format!("ops[{i}].before")),
+                                format!(
+                                    "ops[{i}] (delete) before substring is ambiguous in block '{}' (matches {matches} times); provide occurrence",
+                                    op.block_id
+                                ),
+                            ));
+                        }
+                    }
+                    Some(Occurrence::Index(n)) => {
+                        if n == 0 || (n as usize) > matches {
+                            return Err(err_op(
+                                DiagnosticCode::OccurrenceOutOfRange,
+                                i,
+                                op.op,
+                                Some(op.block_id.clone()),
+                                Some(format!("ops[{i}].occurrence")),
+                                format!(
+                                    "ops[{i}] (delete) occurrence out of range for block '{}' (occurrence={n}, matches={matches})",
+                                    op.block_id
+                                ),
+                            ));
+                        }
+                    }
+                    Some(Occurrence::Legacy(DeleteOccurrence::First)) => {}
+                    Some(Occurrence::Legacy(DeleteOccurrence::All)) => {}
                 }
             }
 

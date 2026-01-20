@@ -85,7 +85,9 @@ fn strict_kindcode_allows_custom_ranges() {
             block_id: "boiler".to_string(),
             before: Some("Cookie banner".to_string()),
             after: None,
-            occurrence: Some(bdir_patch::schema::DeleteOccurrence::First),
+            occurrence: Some(bdir_patch::schema::Occurrence::Legacy(
+                bdir_patch::schema::DeleteOccurrence::First,
+            )),
             content: None,
             message: None,
         }],

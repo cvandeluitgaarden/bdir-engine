@@ -1,4 +1,4 @@
-use crate::schema::{DeleteOccurrence, OpType, PatchV1};
+use crate::schema::{DeleteOccurrence, Occurrence, OpType, PatchV1};
 use crate::telemetry::PatchTelemetry;
 use crate::validate::{
     validate_patch,
@@ -13,8 +13,8 @@ use bdir_editpacket::{BlockTupleV1, EditPacketV1};
 /// Apply a patch against an Edit Packet and return an updated Edit Packet.
 ///
 /// Deterministic semantics:
-/// - replace: replace the FIRST occurrence of `before` with `after` within the block text
-/// - delete: remove FIRST or ALL occurrences of `before` within the block text (explicit via `occurrence`)
+/// - replace: replace an unambiguous match of `before` with `after` (or a selected `occurrence`)
+/// - delete: delete an unambiguous match of `before` (or a selected `occurrence`)
 /// - insert_after: inserts a new block AFTER the referenced block_id, with `text = after`
 /// - suggest: no mutation (informational only)
 ///
@@ -64,7 +64,19 @@ pub fn apply_patch_against_edit_packet_with_options(
                     .ok_or_else(|| format!("unknown block_id '{}'", op.block_id))?;
 
                 let current_text = out.b[idx].3.clone();
-                let next_text = replace_first(&current_text, before, after);
+                let next_text = match op.occurrence {
+                    Some(Occurrence::Index(n)) => replace_nth_non_overlapping(&current_text, before, after, n)
+                        .ok_or_else(|| {
+                            format!(
+                                "replace occurrence out of range (block_id='{}', occurrence={n})",
+                                op.block_id
+                            )
+                        })?,
+                    Some(Occurrence::Legacy(_)) => {
+                        return Err("replace occurrence must be an integer (legacy string values are delete-only)".to_string());
+                    }
+                    None => replace_first(&current_text, before, after),
+                };
                 out.b[idx].3 = next_text;
             }
 
@@ -74,17 +86,22 @@ pub fn apply_patch_against_edit_packet_with_options(
                     .as_deref()
                     .ok_or_else(|| "ops delete missing before (should be validated)".to_string())?;
 
-                let occ = op
-                    .occurrence
-                    .unwrap_or(crate::schema::DeleteOccurrence::All);
+                let occ = op.occurrence;
 
                 let idx = find_block_index(&out.b, &op.block_id)
                     .ok_or_else(|| format!("unknown block_id '{}'", op.block_id))?;
 
                 let current_text = out.b[idx].3.clone();
                 out.b[idx].3 = match occ {
-                    DeleteOccurrence::First => delete_first(&current_text, before),
-                    DeleteOccurrence::All => current_text.replace(before, ""),
+                    Some(Occurrence::Legacy(DeleteOccurrence::All)) => current_text.replace(before, ""),
+                    Some(Occurrence::Legacy(DeleteOccurrence::First)) => delete_first(&current_text, before),
+                    Some(Occurrence::Index(n)) => delete_nth_non_overlapping(&current_text, before, n).ok_or_else(|| {
+                        format!(
+                            "delete occurrence out of range (block_id='{}', occurrence={n})",
+                            op.block_id
+                        )
+                    })?,
+                    None => delete_first(&current_text, before),
                 };
             }
 
@@ -153,7 +170,19 @@ pub fn apply_patch_against_document(doc: &Document, patch: &PatchV1) -> Result<D
                     .ok_or_else(|| format!("unknown block_id '{}'", op.block_id))?;
 
                 let current_text = out.blocks[idx].text.clone();
-                out.blocks[idx].text = replace_first(&current_text, before, after);
+                out.blocks[idx].text = match op.occurrence {
+                    Some(Occurrence::Index(n)) => replace_nth_non_overlapping(&current_text, before, after, n)
+                        .ok_or_else(|| {
+                            format!(
+                                "replace occurrence out of range (block_id='{}', occurrence={n})",
+                                op.block_id
+                            )
+                        })?,
+                    Some(Occurrence::Legacy(_)) => {
+                        return Err("replace occurrence must be an integer (legacy string values are delete-only)".to_string());
+                    }
+                    None => replace_first(&current_text, before, after),
+                };
             }
 
             OpType::Delete => {
@@ -162,17 +191,22 @@ pub fn apply_patch_against_document(doc: &Document, patch: &PatchV1) -> Result<D
                     .as_deref()
                     .ok_or_else(|| "ops delete missing before (should be validated)".to_string())?;
 
-                let occ = op
-                    .occurrence
-                    .unwrap_or(crate::schema::DeleteOccurrence::All);
+                let occ = op.occurrence;
 
                 let idx = find_doc_block_index(&out.blocks, &op.block_id)
                     .ok_or_else(|| format!("unknown block_id '{}'", op.block_id))?;
 
                 let current_text = out.blocks[idx].text.clone();
                 out.blocks[idx].text = match occ {
-                    DeleteOccurrence::First => delete_first(&current_text, before),
-                    DeleteOccurrence::All => current_text.replace(before, ""),
+                    Some(Occurrence::Legacy(DeleteOccurrence::All)) => current_text.replace(before, ""),
+                    Some(Occurrence::Legacy(DeleteOccurrence::First)) => delete_first(&current_text, before),
+                    Some(Occurrence::Index(n)) => delete_nth_non_overlapping(&current_text, before, n).ok_or_else(|| {
+                        format!(
+                            "delete occurrence out of range (block_id='{}', occurrence={n})",
+                            op.block_id
+                        )
+                    })?,
+                    None => delete_first(&current_text, before),
                 };
             }
 

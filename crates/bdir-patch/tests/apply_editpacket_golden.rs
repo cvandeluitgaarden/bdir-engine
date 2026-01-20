@@ -27,14 +27,14 @@ fn baseline_packet() -> EditPacketV1 {
 }
 
 #[test]
-fn golden_replace_replaces_first_occurrence_only() {
+fn golden_replace_with_occurrence_replaces_selected_match() {
     let packet = baseline_packet();
 
     // before must be >= 8 chars per validator
     let patch: PatchV1 = serde_json::from_value(json!({
         "v": 1,
         "ops": [
-            { "op": "replace", "block_id": "p1", "before": "teh first", "after": "the first" }
+            { "op": "replace", "block_id": "p1", "before": "teh first", "after": "the first", "occurrence": 1 }
         ]
     })).unwrap();
 
@@ -48,20 +48,19 @@ fn golden_replace_replaces_first_occurrence_only() {
 }
 
 #[test]
-fn golden_delete_removes_all_occurrences() {
-    let mut packet = baseline_packet();
-    packet.b[1].3 = "DELETE_ME DELETE_ME DELETE_ME".to_string();
+fn golden_replace_without_occurrence_is_rejected_when_ambiguous() {
+    let packet = baseline_packet();
 
     let patch: PatchV1 = serde_json::from_value(json!({
         "v": 1,
         "ops": [
-            { "op": "delete", "block_id": "p2", "before": "DELETE_ME", "occurrence": "all" }
+            { "op": "replace", "block_id": "p1", "before": "teh first", "after": "the first" }
         ]
     })).unwrap();
 
     let patch = bind_patch_to_edit_packet(patch, &packet);
-    let out = apply_patch_against_edit_packet(&packet, &patch).unwrap();
-    assert_eq!(out.b[1].3.trim(), "");
+    let err = apply_patch_against_edit_packet(&packet, &patch).unwrap_err();
+    assert!(err.contains("ambiguous"));
 }
 
 #[test]
@@ -72,13 +71,30 @@ fn golden_delete_removes_first_occurrence_only() {
     let patch: PatchV1 = serde_json::from_value(json!({
         "v": 1,
         "ops": [
-            { "op": "delete", "block_id": "p2", "before": "DELETE_ME", "occurrence": "first" }
+            { "op": "delete", "block_id": "p2", "before": "DELETE_ME", "occurrence": 1 }
         ]
     })).unwrap();
 
     let patch = bind_patch_to_edit_packet(patch, &packet);
     let out = apply_patch_against_edit_packet(&packet, &patch).unwrap();
     assert_eq!(out.b[1].3.trim(), "DELETE_ME DELETE_ME");
+}
+
+#[test]
+fn golden_delete_without_occurrence_is_rejected_when_ambiguous() {
+    let mut packet = baseline_packet();
+    packet.b[1].3 = "DELETE_ME DELETE_ME DELETE_ME".to_string();
+
+    let patch: PatchV1 = serde_json::from_value(json!({
+        "v": 1,
+        "ops": [
+            { "op": "delete", "block_id": "p2", "before": "DELETE_ME" }
+        ]
+    })).unwrap();
+
+    let patch = bind_patch_to_edit_packet(patch, &packet);
+    let err = apply_patch_against_edit_packet(&packet, &patch).unwrap_err();
+    assert!(err.contains("ambiguous"));
 }
 
 #[test]
