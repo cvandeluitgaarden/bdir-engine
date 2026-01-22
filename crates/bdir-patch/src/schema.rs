@@ -29,6 +29,9 @@ pub enum OpType {
     Replace,
     Delete,
     InsertAfter,
+    InsertBefore,
+    ReplaceBlock,
+    DeleteBlock,
     Suggest,
 }
 
@@ -113,6 +116,12 @@ pub struct PatchOpV1 {
     /// `suggest` only: advisory message.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub message: Option<String>,
+
+    /// Optional human-readable rationale for review/audit.
+    ///
+    /// RFC-0001 v1.1: advisory only; MUST NOT affect validation or application semantics.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub rationale: Option<String>,
 
     /// `suggest` only: optional severity.
     #[serde(skip_serializing_if = "Option::is_none")]

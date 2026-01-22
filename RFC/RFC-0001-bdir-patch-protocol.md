@@ -308,9 +308,17 @@ Field semantics:
 - `ops` (array)
   - Ordered list of patch operations.
 
+A patch with an empty `ops` array (`"ops": []`) is valid and represents a completed review that proposes no changes.
+
 ### 8.1 General Rules
 
 AI systems **MUST** output patch instructions rather than rewritten documents.
+
+Operations MAY include an optional `rationale` field containing a human-readable explanation intended for review or audit workflows.
+
+- `rationale` MUST NOT affect validation or application semantics.
+- Receivers MAY ignore or discard `rationale`.
+
 
 ### 8.2 Supported Operations
 
@@ -319,6 +327,9 @@ The protocol defines the following operation types:
 - `replace`
 - `delete`
 - `insert_after`
+- `insert_before`
+- `replace_block`
+- `delete_block`
 - `suggest`
 
 ### 8.2.1 `replace` operation semantics

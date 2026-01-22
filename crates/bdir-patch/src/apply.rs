@@ -155,6 +155,64 @@ pub fn apply_patch_against_edit_packet_with_options(
                 out.b.insert(anchor_idx + 1, new_tuple);
             }
 
+            OpType::InsertBefore => {
+                let new_block_id = op
+                    .new_block_id
+                    .as_deref()
+                    .ok_or_else(|| {
+                        "ops insert_before missing new_block_id (should be validated)".to_string()
+                    })?;
+                let kind_code = op
+                    .kind_code
+                    .ok_or_else(|| {
+                        "ops insert_before missing kind_code (should be validated)".to_string()
+                    })?;
+                let text = op
+                    .text
+                    .as_deref()
+                    .ok_or_else(|| "ops insert_before missing text (should be validated)".to_string())?;
+
+                let anchor_idx = find_block_index(&out.b, &op.block_id)
+                    .ok_or_else(|| format!("unknown block_id '{}'", op.block_id))?;
+
+                if out.b.iter().any(|t| t.0 == new_block_id) {
+                    return Err(format!(
+                        "insert_before new_block_id '{}' already exists",
+                        new_block_id
+                    ));
+                }
+
+                let new_tuple: BlockTupleV1 = (
+                    new_block_id.to_string(),
+                    kind_code,
+                    String::new(),
+                    normalize_nfc(text),
+                );
+
+                out.b.insert(anchor_idx, new_tuple);
+            }
+
+            OpType::ReplaceBlock => {
+                let text = op
+                    .text
+                    .as_deref()
+                    .ok_or_else(|| "ops replace_block missing text (should be validated)".to_string())?;
+
+                let idx = find_block_index(&out.b, &op.block_id)
+                    .ok_or_else(|| format!("unknown block_id '{}'", op.block_id))?;
+
+                out.b[idx].3 = normalize_nfc(text);
+                if let Some(kc) = op.kind_code {
+                    out.b[idx].1 = kc;
+                }
+            }
+
+            OpType::DeleteBlock => {
+                let idx = find_block_index(&out.b, &op.block_id)
+                    .ok_or_else(|| format!("unknown block_id '{}'", op.block_id))?;
+                out.b.remove(idx);
+            }
+
             OpType::Suggest => {
                 // Non-mutating. Validation already ensures non-empty `message`.
             }

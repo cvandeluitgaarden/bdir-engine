@@ -20,6 +20,8 @@ pub enum DiagnosticCode {
     UnknownBlockId,
     MissingField,
     UnexpectedField,
+    /// Patch contains conflicting operations targeting the same block_id.
+    ConflictingOperations,
     BeforeEmpty,
     BeforeTooShort,
     BeforeNotFound,

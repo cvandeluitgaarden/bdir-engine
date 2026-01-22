@@ -8,13 +8,15 @@
       "block_id": "p1",
       "before": "teh",
       "after": "the",
-      "message": "Fix common typo."
+      "message": "Fix common typo.",
+      "rationale": "(optional) reason for change"
     },
     {
       "op": "delete",
       "block_id": "b1",
       "before": "Home > Section > Page",
-      "message": "Remove breadcrumb boilerplate."
+      "message": "Remove breadcrumb boilerplate.",
+      "rationale": "(optional) reason for change"
     },
     {
       "op": "insert_after",
@@ -22,13 +24,33 @@
       "new_block_id": "p2",
       "kind_code": 2,
       "text": "This is a newly inserted paragraph.",
-      "message": "Insert an additional paragraph for clarity."
+      "message": "Insert an additional paragraph for clarity.",
+      "rationale": "(optional) reason for change"
     },
     {
       "op": "suggest",
       "block_id": "p2",
       "message": "Consider splitting this long paragraph into two for readability.",
       "severity": "low"
+    },
+    {
+      "op": "insert_before",
+      "block_id": "p1",
+      "new_block_id": "new_before_1",
+      "kind_code": 0,
+      "text": "Inserted block before target.",
+      "rationale": "Add missing context before the paragraph."
+    },
+    {
+      "op": "replace_block",
+      "block_id": "p1",
+      "text": "Full replacement block text.",
+      "rationale": "Rewrite for clarity."
+    },
+    {
+      "op": "delete_block",
+      "block_id": "p1",
+      "rationale": "Remove outdated block."
     }
   ]
 }

@@ -30,7 +30,7 @@ impl Default for CanonicalizeOptions {
 ///
 /// Ordering:
 /// 1) `block_id` (lexicographic)
-/// 2) operation type (delete, replace, insert_after, suggest)
+/// 2) operation type (delete_block, delete, replace_block, replace, insert_before, insert_after, suggest)
 /// 3) operation-specific fields (`before`, `after`, insert_after fields, `message`, `occurrence`)
 /// 4) original index (tie-breaker for deterministic output)
 pub fn canonicalize_patch_ops(patch: &mut PatchV1) {
@@ -51,10 +51,13 @@ pub fn canonicalize_patch_ops_against_edit_packet(packet: &EditPacketV1, patch: 
 
 fn op_rank(op: OpType) -> i32 {
     match op {
-        OpType::Delete => 0,
-        OpType::Replace => 1,
-        OpType::InsertAfter => 2,
-        OpType::Suggest => 3,
+        OpType::DeleteBlock => 0,
+        OpType::Delete => 1,
+        OpType::ReplaceBlock => 2,
+        OpType::Replace => 3,
+        OpType::InsertBefore => 4,
+        OpType::InsertAfter => 5,
+        OpType::Suggest => 6,
     }
 }
 
@@ -88,10 +91,13 @@ fn canonicalize_ops_inner(ops: &mut Vec<PatchOpV1>, order: Option<&HashMap<&str,
                     op_rank: op_rank(op.op),
                     before: op.before.clone().unwrap_or_default(),
                     after: op.after.clone().unwrap_or_default(),
+                    block_text: op.text.clone().unwrap_or_default(),
+                    block_kind_code: op.kind_code.unwrap_or_default(),
                     insert_new_block_id: op.new_block_id.clone().unwrap_or_default(),
                     insert_kind_code: op.kind_code.unwrap_or_default(),
                     insert_text: op.text.clone().unwrap_or_default(),
                     message: op.message.clone().unwrap_or_default(),
+                    rationale: op.rationale.clone().unwrap_or_default(),
                     occurrence_rank: occurrence_rank(op.occurrence),
                 },
             )
@@ -116,10 +122,13 @@ struct CanonicalKey {
     op_rank: i32,
     before: String,
     after: String,
+    block_text: String,
+    block_kind_code: u16,
     insert_new_block_id: String,
     insert_kind_code: u16,
     insert_text: String,
     message: String,
+    rationale: String,
     occurrence_rank: i64,
 }
 
@@ -131,10 +140,13 @@ impl Ord for CanonicalKey {
             .then_with(|| self.op_rank.cmp(&other.op_rank))
             .then_with(|| self.before.cmp(&other.before))
             .then_with(|| self.after.cmp(&other.after))
+            .then_with(|| self.block_text.cmp(&other.block_text))
+            .then_with(|| self.block_kind_code.cmp(&other.block_kind_code))
             .then_with(|| self.insert_new_block_id.cmp(&other.insert_new_block_id))
             .then_with(|| self.insert_kind_code.cmp(&other.insert_kind_code))
             .then_with(|| self.insert_text.cmp(&other.insert_text))
             .then_with(|| self.message.cmp(&other.message))
+            .then_with(|| self.rationale.cmp(&other.rationale))
             .then_with(|| self.occurrence_rank.cmp(&other.occurrence_rank))
     }
 }

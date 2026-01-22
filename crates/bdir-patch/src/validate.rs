@@ -1,4 +1,5 @@
 use bdir_core::model::Document;
+use std::collections::HashMap;
 use bdir_core::hash::normalize_nfc;
 
 use crate::{
@@ -265,6 +266,44 @@ pub fn validate_patch_with_diagnostics(
             ),
         ));
     }
+
+
+// RFC-0001 v1.1 conflict rejection:
+// Reject patches with conflicting mutating operations targeting the same block_id.
+//
+// - delete_block conflicts with any other op on the same block_id
+// - replace_block conflicts with substring replace/delete on the same block_id
+let mut seen: HashMap<&str, Vec<(usize, OpType)>> = HashMap::new();
+for (i, op) in patch.ops.iter().enumerate() {
+    seen.entry(op.block_id.as_str()).or_default().push((i, op.op));
+}
+for (block_id, opset) in &seen {
+    let has_delete_block = opset.iter().any(|(_, t)| *t == OpType::DeleteBlock);
+    if has_delete_block && opset.len() > 1 {
+        let (i, _) = opset.iter().find(|(_, t)| *t != OpType::DeleteBlock).copied().unwrap_or(opset[0]);
+        return Err(err_op(
+            DiagnosticCode::ConflictingOperations,
+            i,
+            patch.ops[i].op,
+            Some((*block_id).to_string()),
+            Some(format!("ops[{i}].op")),
+            format!("conflicting operations for block_id '{}' (delete_block cannot be combined with other ops)", block_id),
+        ));
+    }
+    let has_replace_block = opset.iter().any(|(_, t)| *t == OpType::ReplaceBlock);
+    let has_substring_mutation = opset.iter().any(|(_, t)| *t == OpType::Replace || *t == OpType::Delete);
+    if has_replace_block && has_substring_mutation {
+        let (i, _) = opset.iter().find(|(_, t)| *t == OpType::Replace || *t == OpType::Delete).copied().unwrap_or(opset[0]);
+        return Err(err_op(
+            DiagnosticCode::ConflictingOperations,
+            i,
+            patch.ops[i].op,
+            Some((*block_id).to_string()),
+            Some(format!("ops[{i}].op")),
+            format!("conflicting operations for block_id '{}' (replace_block cannot be combined with substring replace/delete)", block_id),
+        ));
+    }
+}
 
     for (i, op) in patch.ops.iter().enumerate() {
         let block = doc
@@ -556,7 +595,219 @@ pub fn validate_patch_with_diagnostics(
                 }
             }
 
-            OpType::Suggest => {
+            
+OpType::InsertBefore => {
+    if op.occurrence.is_some() {
+        return Err(err_op(
+            DiagnosticCode::UnexpectedField,
+            i,
+            op.op,
+            Some(op.block_id.clone()),
+            Some(format!("ops[{i}].occurrence")),
+            format!(
+                "ops[{i}] (insert_before) unexpected occurrence (only valid for delete)"
+            ),
+        ));
+    }
+    if op.before.is_some() {
+        return Err(err_op(
+            DiagnosticCode::UnexpectedField,
+            i,
+            op.op,
+            Some(op.block_id.clone()),
+            Some(format!("ops[{i}].before")),
+            format!(
+                "ops[{i}] (insert_before) unexpected before (insert_before must not include before/after)"
+            ),
+        ));
+    }
+    if op.after.is_some() {
+        return Err(err_op(
+            DiagnosticCode::UnexpectedField,
+            i,
+            op.op,
+            Some(op.block_id.clone()),
+            Some(format!("ops[{i}].after")),
+            format!(
+                "ops[{i}] (insert_before) unexpected after (insert_before must not include before/after)"
+            ),
+        ));
+    }
+    if op.message.is_some() {
+        return Err(err_op(
+            DiagnosticCode::UnexpectedField,
+            i,
+            op.op,
+            Some(op.block_id.clone()),
+            Some(format!("ops[{i}].message")),
+            format!(
+                "ops[{i}] (insert_before) unexpected message (insert_before is mutating; use suggest instead)"
+            ),
+        ));
+    }
+
+    let new_block_id = op.new_block_id.as_deref().ok_or_else(|| {
+        err_op(
+            DiagnosticCode::MissingField,
+            i,
+            op.op,
+            Some(op.block_id.clone()),
+            Some(format!("ops[{i}].new_block_id")),
+            format!("ops[{i}] (insert_before) missing new_block_id"),
+        )
+    })?;
+    if new_block_id.trim().is_empty() {
+        return Err(err_op(
+            DiagnosticCode::ContentEmpty,
+            i,
+            op.op,
+            Some(op.block_id.clone()),
+            Some(format!("ops[{i}].new_block_id")),
+            format!("ops[{i}] (insert_before) new_block_id is empty"),
+        ));
+    }
+    if doc.blocks.iter().any(|b| b.id == new_block_id) {
+        return Err(err_op(
+            DiagnosticCode::DuplicateBlockId,
+            i,
+            op.op,
+            Some(op.block_id.clone()),
+            Some(format!("ops[{i}].new_block_id")),
+            format!(
+                "ops[{i}] (insert_before) new_block_id '{}' already exists",
+                new_block_id
+            ),
+        ));
+    }
+
+    let _kind_code = op.kind_code.ok_or_else(|| {
+        err_op(
+            DiagnosticCode::MissingField,
+            i,
+            op.op,
+            Some(op.block_id.clone()),
+            Some(format!("ops[{i}].kind_code")),
+            format!("ops[{i}] (insert_before) missing kind_code"),
+        )
+    })?;
+
+    let text = op.text.as_deref().ok_or_else(|| {
+        err_op(
+            DiagnosticCode::MissingField,
+            i,
+            op.op,
+            Some(op.block_id.clone()),
+            Some(format!("ops[{i}].text")),
+            format!("ops[{i}] (insert_before) missing text"),
+        )
+    })?;
+    if text.trim().is_empty() {
+        return Err(err_op(
+            DiagnosticCode::ContentEmpty,
+            i,
+            op.op,
+            Some(op.block_id.clone()),
+            Some(format!("ops[{i}].text")),
+            format!("ops[{i}] (insert_before) text is empty"),
+        ));
+    }
+}
+
+OpType::ReplaceBlock => {
+    if op.occurrence.is_some() {
+        return Err(err_op(
+            DiagnosticCode::UnexpectedField,
+            i,
+            op.op,
+            Some(op.block_id.clone()),
+            Some(format!("ops[{i}].occurrence")),
+            format!("ops[{i}] (replace_block) unexpected occurrence"),
+        ));
+    }
+    if op.before.is_some() {
+        return Err(err_op(
+            DiagnosticCode::UnexpectedField,
+            i,
+            op.op,
+            Some(op.block_id.clone()),
+            Some(format!("ops[{i}].before")),
+            format!("ops[{i}] (replace_block) unexpected before"),
+        ));
+    }
+    if op.after.is_some() {
+        return Err(err_op(
+            DiagnosticCode::UnexpectedField,
+            i,
+            op.op,
+            Some(op.block_id.clone()),
+            Some(format!("ops[{i}].after")),
+            format!("ops[{i}] (replace_block) unexpected after"),
+        ));
+    }
+    if op.new_block_id.is_some() {
+        return Err(err_op(
+            DiagnosticCode::UnexpectedField,
+            i,
+            op.op,
+            Some(op.block_id.clone()),
+            Some(format!("ops[{i}].new_block_id")),
+            format!("ops[{i}] (replace_block) unexpected new_block_id"),
+        ));
+    }
+    if op.message.is_some() {
+        return Err(err_op(
+            DiagnosticCode::UnexpectedField,
+            i,
+            op.op,
+            Some(op.block_id.clone()),
+            Some(format!("ops[{i}].message")),
+            format!("ops[{i}] (replace_block) unexpected message"),
+        ));
+    }
+
+    let text = op.text.as_deref().ok_or_else(|| {
+        err_op(
+            DiagnosticCode::MissingField,
+            i,
+            op.op,
+            Some(op.block_id.clone()),
+            Some(format!("ops[{i}].text")),
+            format!("ops[{i}] (replace_block) missing text"),
+        )
+    })?;
+    if text.trim().is_empty() {
+        return Err(err_op(
+            DiagnosticCode::ContentEmpty,
+            i,
+            op.op,
+            Some(op.block_id.clone()),
+            Some(format!("ops[{i}].text")),
+            format!("ops[{i}] (replace_block) text is empty"),
+        ));
+    }
+}
+
+OpType::DeleteBlock => {
+    if op.occurrence.is_some()
+        || op.before.is_some()
+        || op.after.is_some()
+        || op.new_block_id.is_some()
+        || op.kind_code.is_some()
+        || op.text.is_some()
+        || op.message.is_some()
+    {
+        return Err(err_op(
+            DiagnosticCode::UnexpectedField,
+            i,
+            op.op,
+            Some(op.block_id.clone()),
+            Some(format!("ops[{i}]")),
+            format!("ops[{i}] (delete_block) contains fields that are not permitted"),
+        ));
+    }
+}
+
+OpType::Suggest => {
                 if op.occurrence.is_some() {
                     return Err(err_op(
                         DiagnosticCode::UnexpectedField,

@@ -6,19 +6,22 @@
       "op": "replace",
       "block_id": "p1",
       "before": "teh",
-      "after": "the"
+      "after": "the",
+      "rationale": "reason"
     },
     {
       "op": "delete",
       "block_id": "b1",
-      "before": "Home > Section > Page"
+      "before": "Home > Section > Page",
+      "rationale": "reason"
     },
     {
       "op": "insert_after",
       "block_id": "p1",
       "new_block_id": "p2",
       "kind_code": 2,
-      "text": "This is a newly inserted paragraph."
+      "text": "This is a newly inserted paragraph.",
+      "rationale": "reason"
     },
     {
       "op": "suggest",
